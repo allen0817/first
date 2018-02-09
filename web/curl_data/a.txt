@@ -1,0 +1,1 @@
+{"data":[{"{#PSNAME}":"System Board Fan1"},{"{#PSNAME}":"System Board Fan2"},{"{#PSNAME}":"System Board Fan3"}]}

@@ -13,6 +13,7 @@ use yii\helpers\ArrayHelper;
 
 class BaseCurl
 {
+    //yii cli 模式下这个缓存找不到路径，故缓存会失败
 
     public $client;
 
@@ -29,7 +30,14 @@ class BaseCurl
 
     public $allData=[];
 
+    static $timeOut = 300;//缓存时间 s
+    public $cacheData;
+    public $cacheTime;
+    public $cacheHand;
 
+    static $BASE_PATH = '/usr/local/src/first/web/curl_data/';
+
+    public $path;
 
 
     public function __construct($ip,$user,$pwd)
@@ -37,6 +45,14 @@ class BaseCurl
         $this->ip = $ip;
         $this->user = $user;
         $this->pwd = $pwd;
+
+//        $this->cacheData = $ip.'data';
+//        $this->cacheTime = $ip.'time';
+//        $this->cacheHand=$ip.'hand';
+
+        $this->path = self::$BASE_PATH.$ip;
+
+
 
         $this->createClient();
     }
@@ -65,32 +81,35 @@ class BaseCurl
 
 
 
-    public function run(){
-        $cache = \Yii::$app->cache;
-        //$cache->flush();
-        $data = $cache->get($this->ip.'data');
 
-        if($data){
-            return $data;
-        }else{
-            $this->login();
-            $this->getName();
-            $this->getMemory();
-            $this->getSensor();
-            $this->getVital();
-            $this->getProcessor();
-            $this->getHostMac();
-            $this->getVirtualLightPath();
-            $this->logout();
 
-            $data =  [
-                'options' => $this->replaceKong($this->allOptions,true),
-                'data' => $this->allData,//$this->replaceKong($this->allData)
-            ];
-            $cache->set($this->ip.'data',$data,3600*24*30);
-            return $data;
-        }
-    }
+//    public function run(){
+//        $cache = \Yii::$app->cache;
+//        //$cache->flush();
+//        $data = $cache->get($this->ip.'data');
+//
+//        if($data){
+//            return $data;
+//        }else{
+//            $this->login();
+//            $this->getName();
+//            $this->getMemory();
+//            $this->getSensor();
+//            $this->getVital();
+//            $this->getProcessor();
+//            $this->getHostMac();
+//            $this->getVirtualLightPath();
+//            $this->logout();
+//
+//            $data =  [
+//                'options' => $this->replaceKong($this->allOptions,true),
+//                'data' => $this->allData,//$this->replaceKong($this->allData)
+//            ];
+//            $cache->set($this->ip.'data',$data,300);
+//            return $data;
+//        }
+//    }
+
 
 
     public function getClient(){
@@ -116,7 +135,7 @@ class BaseCurl
         $cookie = "HideIPv6WhenDisabled=0; session_id=none";
         curl_setopt($this->client,CURLOPT_URL,$url);
         curl_setopt($this->client,CURLOPT_POST,1);
-        curl_setopt($this->client, CURLOPT_POSTFIELDS, "USERNAME=USERID,PASSWORD=PASSW0RD");
+        curl_setopt($this->client, CURLOPT_POSTFIELDS, "USERNAME=".$this->user."PASSWORD=".$this->pwd);
         curl_setopt($this->client,CURLOPT_COOKIE,$cookie);
 
         $res = curl_exec($this->client);
@@ -375,7 +394,7 @@ class BaseCurl
             $vl = [];
             foreach ($vlh as $k=>$vo){
                 $vl[] = array(
-                    "{#VIRTUALLIGHPATH}" => $vo['Name']
+                    "{#VIRTUALLIGHTPATN}" => $vo['Name']
                 );
             }
 
@@ -418,22 +437,147 @@ class BaseCurl
 
 
     public function test(){
+        $file_json = file_get_contents($this->path);
+        $file_arr = json_decode($file_json,true);
 
-        $cache = \Yii::$app->cache;
-        $cache->flush();
-        $this->run();
-
-        $data = $this->ip.'data';
-        return  json_encode($cache->get($data));
-
-        return json_encode([$this->allOptions,$this->allData]);
-
-
-        return [
-            $this->allOptions,
-            $this->allData
-        ];
+        return $file_arr['time'];
     }
+
+
+    public function run(){
+        if(file_exists($this->path)){
+            $file_json = file_get_contents($this->path);
+            $file_arr = json_decode($file_json,true);
+
+            //检查超时
+            if($file_arr['time'] + self::$timeOut < time() ){ //超时
+                $pid= pcntl_fork();
+                if ($pid == -1) {
+                    die('could not fork');
+                }elseif (!$pid) {
+                    //这里是子进程
+                    $this->hand($file_arr);
+                    exit();
+                }
+
+            }
+            return $file_arr;
+
+        }else{//第一次
+            $this->get();
+            $data =  [
+                'options' => $this->replaceKong($this->allOptions,true),
+                'data' => $this->allData,//$this->replaceKong($this->allData)
+                'time' => time(),
+            ];
+            $this->save($data);
+            return json_encode($data);
+        }
+    }
+
+
+    public function get(){
+        $this->login();
+        $this->getName();
+        $this->getMemory();
+        $this->getSensor();
+        $this->getVital();
+        $this->getProcessor();
+        $this->getHostMac();
+        $this->getVirtualLightPath();
+        $this->logout();
+    }
+
+    public function hand($file_arr){
+
+        if(!isset($file_arr['hand'])){
+            $file_arr['hand'] = true;
+            $this->save($file_arr);
+
+            $this->login();
+            $this->getName();
+            $this->getMemory();
+            $this->getSensor();
+            $this->getVital();
+            $this->getProcessor();
+            $this->getHostMac();
+            $this->getVirtualLightPath();
+            $this->logout();
+            if(!empty($this->allOptions)){
+                $data =  [
+                    'options' => $this->replaceKong($this->allOptions,true),
+                    'data' => $this->allData,//$this->replaceKong($this->allData)
+                    'time' => time()
+                ];
+                $this->save($data);
+            }
+        }
+    }
+
+
+    public function save($data){
+        file_put_contents($this->path,json_encode($data));
+    }
+
+
+
+
+    /**
+
+    public function run(){
+        $cache = Yii::$app->cache;
+        $data = $cache->get($this->cacheData);
+
+        //检查超时
+        $cacheTime =  $cache->get($this->cacheTime);
+        if( $cacheTime+self::$timeOut > time() ){ //未超时
+            return $data;
+        }else{//已超时
+            $pid= pcntl_fork();
+            if ($pid == -1) {
+                die('could not fork');
+            } else if (!$pid) {
+                //这里是子进程
+                $this->hand();
+                exit();
+            }else{
+                //这里是父进程
+                return $data;
+            }
+        }
+    }
+
+    public function hand(){
+        $cache = \Yii::$app->cache;
+        if (!$cache->get($this->cacheHand)){
+            $cache->set($this->cacheHand,true);
+            $this->login();
+            $this->getName();
+            $this->getMemory();
+            $this->getSensor();
+            $this->getVital();
+            $this->getProcessor();
+            $this->getHostMac();
+            $this->getVirtualLightPath();
+            $this->logout();
+
+            if(!empty($this->allOptions)){
+                $data =  [
+                    'options' => $this->replaceKong($this->allOptions,true),
+                    'data' => $this->allData,//$this->replaceKong($this->allData)
+                ];
+                $cache->set($this->cacheData,$data);
+                $cache->set($this->cacheTime,time());
+            }
+            $cache->set($this->cacheHand,null);
+
+        }
+    }
+
+**/
+
+
+
 
 
 }

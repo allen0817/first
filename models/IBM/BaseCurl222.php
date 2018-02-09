@@ -8,6 +8,7 @@
 
 namespace  app\models\IBM;
 
+use Yii;
 use yii\helpers\ArrayHelper;
 
 class BaseCurl
@@ -64,10 +65,14 @@ class BaseCurl
 
 
 
+
+
     public function run(){
         $cache = \Yii::$app->cache;
         //$cache->flush();
         $data = $cache->get($this->ip.'data');
+
+        $this->state();
 
         if($data){
             return $data;
@@ -84,10 +89,21 @@ class BaseCurl
 
             $data =  [
                 'options' => $this->replaceKong($this->allOptions,true),
-                'data' => $this->replaceKong($this->allData)
+                'data' => $this->allData,//$this->replaceKong($this->allData)
             ];
             $cache->set($this->ip.'data',$data,3600*24);
             return $data;
+        }
+    }
+
+    public function state(){
+        $cache = \Yii::$app->cache;
+        $key = $this->ip.'state';
+        $data = $cache->get($key);
+        if(!$data){
+            $this->login();
+            $this->getVirtualLightPath();
+            $cache->set($key,true,300);
         }
     }
 
@@ -115,7 +131,7 @@ class BaseCurl
         $cookie = "HideIPv6WhenDisabled=0; session_id=none";
         curl_setopt($this->client,CURLOPT_URL,$url);
         curl_setopt($this->client,CURLOPT_POST,1);
-        curl_setopt($this->client, CURLOPT_POSTFIELDS, "USERNAME=USERID,PASSWORD=PASSW0RD");
+        curl_setopt($this->client, CURLOPT_POSTFIELDS, "USERNAME=".$this->user."PASSWORD=".$this->pwd);
         curl_setopt($this->client,CURLOPT_COOKIE,$cookie);
 
         $res = curl_exec($this->client);
@@ -260,7 +276,7 @@ class BaseCurl
             foreach ($mlv as $k=>$vo){
                 $k = strtoupper($k);
                 $m[] = array(
-                    "{#$k}" => $vo
+                    "{#$k}" => $k
                 );
             }
             $this->allOptions =  ArrayHelper::merge($this->allOptions,$m);
@@ -281,7 +297,7 @@ class BaseCurl
             $vp = [];
             foreach ($vpd as $k=>$vo){
                 $vp[] = array(
-                    "{#FIRWARENAME}" => $vo['FirmwareName']
+                    "{#FIRMWARENAME}" => $vo['FirmwareName']
                 );
             }
 
@@ -374,12 +390,38 @@ class BaseCurl
             $vl = [];
             foreach ($vlh as $k=>$vo){
                 $vl[] = array(
-                    "{#VIRTUALLIGHPATH}" => $vo['Name']
+                    "{#VIRTUALLIGHTPATN}" => $vo['Name']
                 );
             }
 
-            $this->allOptions =  ArrayHelper::merge($this->allOptions,$vl);
-            $this->allData = ArrayHelper::merge($this->allData,$vlh);
+            //先这样
+            $optionBool=false;
+            foreach ($this->allOptions as $vo){
+                foreach ($vo as $k=>$v){
+                    if($k=='{#VIRTUALLIGHPATH}'){
+                        $optionBool = true;
+                        break;
+                    }
+                }
+            }
+            if(!$optionBool) $this->allOptions =  ArrayHelper::merge($this->allOptions,$vl);
+
+            if(!empty($vlh)){
+              foreach ($vlh as $vo){
+                  $bool = true;
+                  foreach ($this->allData as $k=>$v){
+                      if($v['name']==$vo['name']){
+                          $this->allData[$k] = $vo;
+                          $bool=false;
+                          break;
+                      }
+                  }
+                  if($bool) ArrayHelper::merge($this->allData,$vo);
+              }
+            }
+
+//            $this->allOptions =  ArrayHelper::merge($this->allOptions,$vl);
+            //$this->allData = ArrayHelper::merge($this->allData,$vlh);
         }
 
     }
@@ -415,6 +457,27 @@ class BaseCurl
         curl_exec($this->client);
     }
 
+
+    public function test(){
+
+        $cache = \Yii::$app->cache;
+        $cache->flush();
+
+
+
+        $this->run();
+
+        $data = $this->ip.'data';
+        return  json_encode($cache->get($data));
+
+        return json_encode([$this->allOptions,$this->allData]);
+
+
+        return [
+            $this->allOptions,
+            $this->allData
+        ];
+    }
 
 
 }
