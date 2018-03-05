@@ -95,7 +95,6 @@ class InspurController extends Controller
                 }
 
             }
-            //echo $rs[0];
             foreach ( $data as $k=>$vo){
                 if(is_array($vo)){
                     foreach ($vo as $k1=>$v){

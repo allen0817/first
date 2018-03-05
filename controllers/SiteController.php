@@ -216,6 +216,23 @@ class SiteController extends Controller
     }
 
 
+    public function actionB(){
+        $arr = ['inspur','ibm'];
+        $str = 'ibm';
+
+        foreach ($arr as $vo){
+            if (preg_match("/$vo/i",$str)){
+                return strtoupper($vo);
+            }
+        }
+
+
+
+
+
+
+    }
+
 
 
 
