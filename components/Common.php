@@ -11,8 +11,12 @@ namespace app\components;
 
 class Common
 {
+    /**查找机器型号
+     * @param $class
+     * @return string
+     */
     public static function findClass($class){
-        $arr = ['inspur','ibm'];
+        $arr = \Yii::$app->params['versions'];
         foreach ($arr as $vo){
             if (preg_match("/$vo/i",$class)){
                 return strtoupper($vo);

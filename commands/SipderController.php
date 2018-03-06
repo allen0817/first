@@ -16,6 +16,12 @@ use yii\console\Controller;
 
 class SipderController extends Controller
 {
+//UserParameter=sipderoptions[*],php_cli  /usr/local/src/first/yii sipder/options  $1 $2 $3 $4
+//UserParameter=sipder[*],php_cli  /usr/local/src/first/yii sipder/data $1  $2 $3 $4 $5
+
+//php_cli  /usr/local/src/first/yii sipder/options  172.16.253.181 USERID PASSW0RD ibmx3850
+//php_cli  /usr/local/src/first/yii sipder/data CHANNELB.STATE 172.16.253.181 USERID PASSW0RD  ibmx3850
+
 
     /**
      * 所有监控项

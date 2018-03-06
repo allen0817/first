@@ -217,7 +217,10 @@ class SiteController extends Controller
 
 
     public function actionB(){
-        $arr = ['inspur','ibm'];
+        $arr = Yii::$app->params['versions'];
+
+        print_r($arr);
+
         $str = 'ibm';
 
         foreach ($arr as $vo){
