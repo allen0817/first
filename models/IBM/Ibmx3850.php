@@ -9,7 +9,15 @@
 namespace app\models\IBM;
 
 
+use yii\base\Exception;
 use yii\helpers\ArrayHelper;
+
+
+/** ibm 有空格 有大小写，key 先去掉空隔，再转大写。  匹配时 也这样做
+ * Class Ibmx3850
+ * @package app\models\IBM
+ */
+
 
 class Ibmx3850 extends \app\components\BaseCurl
 {
@@ -33,6 +41,33 @@ class Ibmx3850 extends \app\components\BaseCurl
                 $this->cookie = "HideIPv6WhenDisabled=0; session_id=".$c[1];
             }
         }
+    }
+
+
+    protected function getUrl($key,$method='Monitors'){
+        return '<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:wsman="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd">
+  <SOAP-ENV:Header>
+    <wsa:To>http://'.$this->ip.'/wsman</wsa:To>
+    <wsa:ReplyTo>
+      <wsa:Address>http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous</wsa:Address>
+    </wsa:ReplyTo>
+    <wsman:ResourceURI>http://www.ibm.com/iBMC/sp/'.$method.'</wsman:ResourceURI>
+    <wsa:Action>http://www.ibm.com/iBMC/sp/'.$method.'/'.$key.'</wsa:Action>
+    <wsa:MessageID>dt:'.time().'</wsa:MessageID>
+  </SOAP-ENV:Header>
+  <SOAP-ENV:Body>
+    <'.$key.' xmlns="http://www.ibm.com/iBMC/sp/'.$method.'" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema"></'.$key.'>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>';
+    }
+
+
+    /** key 去掉空隔并转大写
+     * @param $key
+     * @return string
+     */
+    public function removeKongAndUp($key){
+        return strtoupper( str_replace(' ','',$key)  );
     }
 
     /**
@@ -75,11 +110,12 @@ class Ibmx3850 extends \app\components\BaseCurl
         curl_setopt($this->getClient(),CURLOPT_URL,$url);
         curl_setopt($this->getClient(), CURLOPT_POSTFIELDS, $param);
         curl_setopt($this->getClient(),CURLOPT_COOKIE,$this->cookie);
-        curl_setopt($this->getClient(), CURLOPT_TIMEOUT, 20 );
+        curl_setopt($this->getClient(), CURLOPT_TIMEOUT, 5 );
         $res = curl_exec($this->getClient());
         $r = '/<s:Body>(.*)<\/s:Body>/i';
         if($res){
             preg_match($r,$res,$data);
+
             $xml = simplexml_load_string($data[1]);
             return json_decode(json_encode($xml),true);
 
@@ -88,329 +124,213 @@ class Ibmx3850 extends \app\components\BaseCurl
     }
 
     /**
-     * @param $key
-     * @return mixed
+     * ibm spname
      */
-    public function getVal($key)
-    {
-        $datas = $this->run();
-        $data = $datas['data'];
-        $r = preg_replace('/{#|}/','',$key);
-        $rs = explode(".",$r);
-        if(count($rs)>1){
-            foreach ($data as $vo){
-                if(is_array($vo)){
-                    foreach ($vo as $k=>$v){
-                        $v = str_replace(' ','',$v);
-                        if(strtoupper($v)==$rs[0]){
-                            foreach ($vo as  $j=>$l){
-                                if( strtoupper($j) == $rs[1]){
-                                    echo $l;exit();
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        //echo $rs[0];
-        foreach ( $data as $k=>$vo){
-            if(is_array($vo)){
-                foreach ($vo as $k1=>$v){
-                    $v = str_replace(' ','',$v);
-                    if(strtoupper($v)==$rs[0]){
-                        echo $v;exit();
-                    }
-                }
-            }
-            if(!is_array($vo)){
-                if( strtoupper($k) == $rs[0] ) {
-                    echo $vo;exit();
-                }
-            }
-        }
-        echo "NULL";
-    }
-
-
-
-    public function replaceKong($data,$options=false){
-        foreach ($data as $k=>$vo){
-            if(is_array($vo)){
-                foreach ($vo as $i=>$v){
-                    $data[$k][$i] = str_replace(' ','',$v);
-                    if($options){
-                        $data[$k][$i] = strtoupper($data[$k][$i]);
-                    }
-
-                }
-            }else{
-                $data[$k] = str_replace(' ','',$vo);
-                if($options){
-                    $data[$k] = strtoupper($data[$k]);
-                }
-            }
-        }
-        return $data;
-    }
-
-
-
-
     public function getName(){
-        $param = '<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:wsman="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd">
-  <SOAP-ENV:Header>
-    <wsa:To>http://'.$this->ip.'/wsman</wsa:To>
-    <wsa:ReplyTo>
-      <wsa:Address>http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous</wsa:Address>
-    </wsa:ReplyTo>
-    <wsman:ResourceURI>http://www.ibm.com/iBMC/sp/iBMCControl</wsman:ResourceURI>
-    <wsa:Action>http://www.ibm.com/iBMC/sp/iBMCControl/GetSPNameSettings</wsa:Action>
-    <wsa:MessageID>dt:'.time().'</wsa:MessageID>
-  </SOAP-ENV:Header>
-  <SOAP-ENV:Body>
-    <GetSPNameSettings xmlns="http://www.ibm.com/iBMC/sp/iBMCControl" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema"></GetSPNameSettings>
-  </SOAP-ENV:Body>
-</SOAP-ENV:Envelope>';
+        $param = $this->getUrl('GetSPNameSettings','iBMCControl');
         $res = $this->exec($param);
-
         if(isset($res['SPName'])){
-            $n= array( array('{#SPNAME}' => $res['SPName'] ));
-            $this->allOptions =  ArrayHelper::merge($this->allOptions,$n);
-            $this->allData = ArrayHelper::merge($this->allData,$n );
+            $val[] = ['{#NAME}'=>strtoupper('SPName'),'VALUE'=>$res['SPName']];
+            $this->allData = ArrayHelper::merge($this->allData,['SPNAME'=>$val]);
         }
     }
 
 
     public function getMemory(){
-        $param = '<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:wsman="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd">
-  <SOAP-ENV:Header>
-    <wsa:To>http://'.$this->ip.'/wsman</wsa:To>
-    <wsa:ReplyTo>
-      <wsa:Address>http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous</wsa:Address>
-    </wsa:ReplyTo>
-    <wsman:ResourceURI>http://www.ibm.com/iBMC/sp/Monitors</wsman:ResourceURI>
-    <wsa:Action>http://www.ibm.com/iBMC/sp/Monitors/GetMemoryInfo</wsa:Action>
-    <wsa:MessageID>dt:'.time().'</wsa:MessageID>
-  </SOAP-ENV:Header>
-  <SOAP-ENV:Body>
-    <GetMemoryInfo xmlns="http://www.ibm.com/iBMC/sp/Monitors" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema"></GetMemoryInfo>
-  </SOAP-ENV:Body>
-</SOAP-ENV:Envelope>
-';
+        $param = $this->getUrl('GetMemoryInfo');
         $res = $this->exec($param);
-
         if(isset($res['Memory']['MemoryInfo'])){
-            $t = [];
+            $val = [];
             foreach ($res['Memory']['MemoryInfo'] as $vo){
-                $t[] = array(
-                    '{#MEMORYINFO}' => $vo['Description']
-                );
+                $vo['{#NAME}'] = $this->removeKongAndUp($vo['Description']);
+                $val[] = $vo;
             }
-            $this->allOptions =  ArrayHelper::merge($this->allOptions,$t);
-            $this->allData = ArrayHelper::merge($this->allData,$res['Memory']['MemoryInfo']);
+            $this->allData = ArrayHelper::merge($this->allData,['MEMORY' => $val]);
         }
     }
 
+
+
     public function getSensor(){
-        $param = '<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:wsman="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd">
-  <SOAP-ENV:Header>
-    <wsa:To>http://'.$this->ip.'/wsman</wsa:To>
-    <wsa:ReplyTo>
-      <wsa:Address>http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous</wsa:Address>
-    </wsa:ReplyTo>
-    <wsman:ResourceURI>http://www.ibm.com/iBMC/sp/Monitors</wsman:ResourceURI>
-    <wsa:Action>http://www.ibm.com/iBMC/sp/Monitors/GetSensorValues</wsa:Action>
-    <wsa:MessageID>dt:'.time().'</wsa:MessageID>
-  </SOAP-ENV:Header>
-  <SOAP-ENV:Body>
-    <GetSensorValues xmlns="http://www.ibm.com/iBMC/sp/Monitors" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema"></GetSensorValues>
-  </SOAP-ENV:Body>
-</SOAP-ENV:Envelope>';
+        $param = $this->getUrl('GetSensorValues');
         $res = $this->exec($param);
 
         if(!empty($res)){
             $health = $res['SystemHealthInfo'];
-            $h = [];
+            $val = [];
             foreach ($health as $k=>$vo){
-                $k = strtoupper($k);
-                $h[] = array(
-                    "{#{$k}}" => $k
+                $val[] = array(
+                    '{#NAME}' => $this->removeKongAndUp($k),
+                    'VALUE' => $vo
                 );
             }
-
-            $this->allOptions =  ArrayHelper::merge($this->allOptions,$h);
-            $this->allData = ArrayHelper::merge($this->allData,$health);
+            $this->allData = ArrayHelper::merge($this->allData,['HEALTH'=>$val]);
 
             $voltage= $res['SensorInfo']['Voltage'];
-            $v = [];
+            $val = [];
             foreach ($voltage as $k=>$vo){
-                $v[] = array(
-                    "{#VOLTAGE}" => $vo['Component']
-                );
+                $vo['{#NAME}'] = $this->removeKongAndUp($vo['Component']);
+                $val[] = $vo;
             }
-            $this->allOptions =  ArrayHelper::merge($this->allOptions,$v);
-            $this->allData = ArrayHelper::merge($this->allData,$voltage);
+            $this->allData = ArrayHelper::merge($this->allData,['VOLTAGE'=>$val]);
 
 
             $fan= $res['SensorInfo']['Fan'];
-            $f = [];
+            $val = [];
             foreach ($fan as $k=>$vo){
-                $f[] = array(
-                    "{#FAN}" => $vo['Component']
-                );
+                $vo['{#NAME}'] = $this->removeKongAndUp($vo['Component']);
+                $val[] = $vo;
             }
-            $this->allOptions =  ArrayHelper::merge($this->allOptions,$f);
-            $this->allData = ArrayHelper::merge($this->allData,$fan);
+            $this->allData = ArrayHelper::merge($this->allData,['FAN' => $val]);
         }
 
     }
 
     public function getVital(){
-        $param = '<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:wsman="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd">
-  <SOAP-ENV:Header>
-    <wsa:To>http://'.$this->ip.'/wsman</wsa:To>
-    <wsa:ReplyTo>
-      <wsa:Address>http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous</wsa:Address>
-    </wsa:ReplyTo>
-    <wsman:ResourceURI>http://www.ibm.com/iBMC/sp/Monitors</wsman:ResourceURI>
-    <wsa:Action>http://www.ibm.com/iBMC/sp/Monitors/GetVitalProductData</wsa:Action>
-    <wsa:MessageID>dt:'.time().'</wsa:MessageID>
-  </SOAP-ENV:Header>
-  <SOAP-ENV:Body>
-    <GetVitalProductData xmlns="http://www.ibm.com/iBMC/sp/Monitors" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema"></GetVitalProductData>
-  </SOAP-ENV:Body>
-</SOAP-ENV:Envelope>';
+        $param = $this->getUrl('GetVitalProductData');
         $res = $this->exec($param);
 
+        //MACHINE
         if(!empty($res)){
             $mlv= $res['GetVitalProductDataResponse']['MachineLevelVPD'];
-            $m = [];
+            $val = [];
+
             foreach ($mlv as $k=>$vo){
-                $k = strtoupper($k);
-                $m[] = array(
-                    "{#$k}" => $k
+                $val[] = array(
+                    '{#NAME}' => $this->removeKongAndUp($k),
+                    'VALUE' => $vo
                 );
             }
-            $this->allOptions =  ArrayHelper::merge($this->allOptions,$m);
-            $this->allData = ArrayHelper::merge($this->allData,$mlv);
+            $this->allData = ArrayHelper::merge($this->allData,['MACHINE'=>$val]);
+
 
             $clv= $res['GetVitalProductDataResponse']['ComponentLevelVPD'];
-            $c = [];
+            $val = [];
             foreach ($clv as $k=>$vo){
-                $c[] = array(
-                    "{#FRUNAME}" => $vo['FRUName']
-                );
+                $vo['{#NAME}'] = $this->removeKongAndUp($vo['FRUName']);
+                $val[] = $vo;
             }
-            $this->allOptions =  ArrayHelper::merge($this->allOptions,$c);
-            $this->allData = ArrayHelper::merge($this->allData,$clv);
+            $this->allData = ArrayHelper::merge($this->allData,['FRU'=>$val]);
 
 
             $vpd= $res['GetVitalProductDataResponse']['VPD'];
-            $vp = [];
+            $val = [];
             foreach ($vpd as $k=>$vo){
-                $vp[] = array(
-                    "{#FIRMWARENAME}" => $vo['FirmwareName']
-                );
-            }
+                $vo['{#NAME}'] = $this->removeKongAndUp($vo['FirmwareName']);
+                $val[] = $vo;
 
-            $this->allOptions =  ArrayHelper::merge($this->allOptions,$vp);
-            $this->allData = ArrayHelper::merge($this->allData,$vpd);
+            }
+            $this->allData = ArrayHelper::merge($this->allData,['FIRMWARE'=>$val]);
         }
 
 
     }
 
     public function getProcessor(){
-        $param = '<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:wsman="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd">
-  <SOAP-ENV:Header>
-    <wsa:To>http://'.$this->ip.'/wsman</wsa:To>
-    <wsa:ReplyTo>
-      <wsa:Address>http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous</wsa:Address>
-    </wsa:ReplyTo>
-    <wsman:ResourceURI>http://www.ibm.com/iBMC/sp/Monitors</wsman:ResourceURI>
-    <wsa:Action>http://www.ibm.com/iBMC/sp/Monitors/GetProcessorInfo</wsa:Action>
-    <wsa:MessageID>dt:'.time().'</wsa:MessageID>
-  </SOAP-ENV:Header>
-  <SOAP-ENV:Body>
-    <GetProcessorInfo xmlns="http://www.ibm.com/iBMC/sp/Monitors" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema"></GetProcessorInfo>
-  </SOAP-ENV:Body>
-</SOAP-ENV:Envelope>';
+        $param = $this->getUrl('GetProcessorInfo');
         $res = $this->exec($param);
         if(!empty($res)){
             $process= $res['Processor']['ProcessorInfo'];
-            $p = [];
+            $val = [];
             foreach ($process as $k=>$vo){
-                $p[] = array(
-                    "{#PROCESSOR}" => $vo['Description']
-                );
+                $vo['{#NAME}'] = $this->removeKongAndUp($vo['Description']);
+                $val[] = $vo;
             }
-
-            $this->allOptions =  ArrayHelper::merge($this->allOptions,$p);
-            $this->allData = ArrayHelper::merge($this->allData,$process);
+            $this->allData = ArrayHelper::merge($this->allData,['PROCESSOR'=>$val]);
         }
     }
 
     public function getHostMac(){
-        $param = '<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:wsman="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd">
-  <SOAP-ENV:Header>
-    <wsa:To>http://'.$this->ip.'/wsman</wsa:To>
-    <wsa:ReplyTo>
-      <wsa:Address>http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous</wsa:Address>
-    </wsa:ReplyTo>
-    <wsman:ResourceURI>http://www.ibm.com/iBMC/sp/Monitors</wsman:ResourceURI>
-    <wsa:Action>http://www.ibm.com/iBMC/sp/Monitors/GetHostMacAddresses</wsa:Action>
-    <wsa:MessageID>dt:'.time().'</wsa:MessageID>
-  </SOAP-ENV:Header>
-  <SOAP-ENV:Body>
-    <GetHostMacAddresses xmlns="http://www.ibm.com/iBMC/sp/Monitors" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema"></GetHostMacAddresses>
-  </SOAP-ENV:Body>
-</SOAP-ENV:Envelope>';
+        $param = $this->getUrl('GetHostMacAddresses');
         $res = $this->exec($param);
-
         if(!empty($res)){
             $HostMaddr= $res['HostMACaddress']['HostMaddr'];
-            $hm = [];
+            $val = [];
             foreach ($HostMaddr as $k=>$vo){
-                $hm[] = array(
-                    "{#HOSTMADDR}" => $vo['Description']
-                );
+                $vo['{#NAME}'] = $this->removeKongAndUp($vo['Description']);
+                $val[] = $vo;
             }
-            $this->allOptions =  ArrayHelper::merge($this->allOptions,$hm);
-            $this->allData = ArrayHelper::merge($this->allData,$HostMaddr);
+            $this->allData = ArrayHelper::merge($this->allData,['MAC'=>$val]);
         }
 
     }
 
     public function getVirtualLightPath(){
-        $param = '<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:wsman="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd">
-  <SOAP-ENV:Header>
-    <wsa:To>http://'.$this->ip.'/wsman</wsa:To>
-    <wsa:ReplyTo>
-      <wsa:Address>http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous</wsa:Address>
-    </wsa:ReplyTo>
-    <wsman:ResourceURI>http://www.ibm.com/iBMC/sp/Monitors</wsman:ResourceURI>
-    <wsa:Action>http://www.ibm.com/iBMC/sp/Monitors/GetVirtualLightPath</wsa:Action>
-    <wsa:MessageID>dt:'.time().'</wsa:MessageID>
-  </SOAP-ENV:Header>
-  <SOAP-ENV:Body>
-    <GetVirtualLightPath xmlns="http://www.ibm.com/iBMC/sp/Monitors" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema"></GetVirtualLightPath>
-  </SOAP-ENV:Body>
-</SOAP-ENV:Envelope>';
+        $param = $this->getUrl('GetVirtualLightPath');
         $res = $this->exec($param);
         if(!empty($res)){
             $vlh= $res['VirtualLightPathArray']['VirtualLightPath'];
-            $vl = [];
+            $val = [];
             foreach ($vlh as $k=>$vo){
-                $vl[] = array(
-                    "{#VIRTUALLIGHTPATN}" => $vo['Name']
-                );
+                $vo['{#NAME}'] = $this->removeKongAndUp($vo['Name']);
+                $val[] = $vo;
             }
-
-            $this->allOptions =  ArrayHelper::merge($this->allOptions,$vl);
-            $this->allData = ArrayHelper::merge($this->allData,$vlh);
+            $this->allData = ArrayHelper::merge($this->allData,['LIGHTPATH'=>$val]);
         }
+    }
 
+
+
+    public  function run(){
+        if(file_exists($this->path)){
+            $file_json = file_get_contents($this->path);
+            $file_arr = json_decode($file_json,true);
+            if($file_arr['time'] + self::$timeOut < time() ){ //超时
+                $pid= pcntl_fork();
+                if ($pid == -1) {
+                    die('could not fork');
+                }elseif (!$pid) {
+                    //这里是子进程
+                    $params = ' '.$this->ip .' '.$this->user .' '.$this->pwd .' '. $this->class;
+                    shell_exec("php  /usr/local/src/first/yii sipder/process   $params  > /dev/null 2>&1 & ");
+                    exit();
+                }
+            }
+            return $file_arr['data'];
+        }else{//第一次
+            $this->getData();
+            if (!empty($this->allData)){
+                $data =  [
+                    'data' => $this->allData,
+                    'time' => time(),
+                ];
+                $this->save($data);
+                return $this->allData;
+            }
+            return [];
+        }
+    }
+
+
+    public function getVal($key)
+    {
+        $data = $this->run();
+        try{
+            if(!empty($data)){
+                $keys = explode('.',$key);
+                foreach ($data as $vo){
+                    foreach ( $vo as $v){
+                        if($v['{#NAME}'] == $this->removeKongAndUp($keys[0]) ){
+                            $tmp = $v;
+                            break;
+                        }
+                    }
+                }
+                if (isset($tmp)){
+                    if (isset($keys[1])){
+                        $tmp = array_change_key_case($tmp,CASE_UPPER);
+                        echo $tmp[$keys[1]];exit();
+                    }else{
+                        if(isset($tmp['SensorName'])) echo $tmp['SensorName'];
+                        else    echo $tmp['{#NAME}'];
+                        exit();
+                    }
+                }
+            }
+        }catch (Exception $e){
+            echo 'null';exit();
+        }
+        echo 'null';exit();
     }
 
 

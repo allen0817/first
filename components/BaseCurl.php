@@ -9,6 +9,8 @@ namespace  app\components;
 
 
 
+use yii\base\Exception;
+
 abstract class BaseCurl
 {
     private  $_client;
@@ -17,6 +19,7 @@ abstract class BaseCurl
     protected $user;
     protected $pwd;
 
+    protected $class;
 
     protected $cookie;
 
@@ -40,11 +43,13 @@ abstract class BaseCurl
      * @return $this
      */
 
-    public function __construct($ip,$user,$pwd)
+    public function __construct($ip,$user,$pwd,$class)
     {
         $this->ip = $ip;
         $this->user = $user;
         $this->pwd = $pwd;
+
+        $this->class = $class;
 
         $this->path = self::$BASE_PATH.$ip;
 
@@ -93,58 +98,114 @@ abstract class BaseCurl
     /**获取单个监控项的值
      * @return mixed
      */
-    abstract public function getVal($key);
 
-    /**执行
-     * 先返回缓存数据，同时只新开一个进程获取新数据，直到成功新数据就覆盖旧数据
-     * @return mixed|string
+    /** 获取单个监控项的值
+     * @return mixed
      */
+    public function getVal($key)
+    {
+        $data = $this->run();
+        try{
+            if(!empty($data)){
+                $keys = explode('.',$key);
+                foreach ($data as $vo){
+                    foreach ( $vo as $v){
+                        if($v['{#NAME}'] == $keys[0] ){
+                            $tmp = $v;
+                            break;
+                        }
+                    }
+                }
+                if (isset($tmp)){
+                    if (isset($keys[1])){
+                        $tmp = array_change_key_case($tmp,CASE_UPPER);
+                        echo $tmp[$keys[1]];exit();
+                    }else{
+                        if(isset($tmp['SensorName'])) echo $tmp['SensorName'];
+                        else    echo $tmp['{#NAME}'];
+                        exit();
+                    }
+                }
+            }
+        }catch (Exception $e){
+            echo 'null';exit();
+        }
+        echo 'null';exit();
+    }
+
+
+
     public  function run(){
         if(file_exists($this->path)){
             $file_json = file_get_contents($this->path);
             $file_arr = json_decode($file_json,true);
-            //检查超时
             if($file_arr['time'] + self::$timeOut < time() ){ //超时
+
                 $pid= pcntl_fork();
                 if ($pid == -1) {
                     die('could not fork');
                 }elseif (!$pid) {
                     //这里是子进程
-                    $this->childProcess($file_arr);
+                    //$this->childProcess($file_arr);
+                    $params = ' '.$this->ip .' '.$this->user .' '.$this->pwd .' '. $this->class;
+                    shell_exec("php  /usr/local/src/first/yii sipder/process   $params  > /dev/null 2>&1 & ");
                     exit();
                 }
+
             }
-            return $file_arr;
+            return $file_arr['data'];
         }else{//第一次
             $this->getData();
-            $data =  [
-                'options' => $this->allOptions,
-                'data' => $this->allData,
-                'time' => time(),
-            ];
-            $this->save($data);
-            return json_encode($data);
+            if (!empty($this->allData)){
+                $data =  [
+                    'data' => $this->allData,
+                    'time' => time(),
+                ];
+                $this->save($data);
+                return $this->allData;
+            }
+            return [];
         }
     }
+
+
+
+
+
 
     /** 子进程获取数据
      * @param $file_arr
      */
-    protected function childProcess($file_arr){
-        if(!isset($file_arr['hand'])){
-            $file_arr['hand'] = true;
-            $this->save($file_arr);
-            $this->getData();
-            $this->logout();
-            if(!empty($this->allOptions)){
-                $data =  [
-                    'options' => $this->allOptions,
-                    'data' => $this->allData,//$this->replaceKong($this->allData)
-                    'time' => time()
-                ];
-                $this->save($data);
-            }
+
+    protected function childProcess(){
+        $this->getData();
+        if(!empty($this->allData)){
+
+            $file_json = file_get_contents($this->path);
+            $file_arr = json_decode($file_json,true);
+            $new = $this->checkData($file_arr['data'],$this->allData);
+
+            $data =  [
+                'data' => $new,
+                'time' => time(),
+            ];
+            $this->save($data);
         }
+        exit();
+    }
+
+
+    protected function childProcess1($file_arr){
+        $this->getData();
+        if(!empty($this->allData)){
+            $new = $this->checkData($file_arr['data'],$this->allData);
+            $data =  [
+                'data' => $new,
+                'time' => time(),
+            ];
+            $this->save($data);
+        }
+        exit();
     }
 
     /** 缓存数据到文件
@@ -163,5 +224,36 @@ abstract class BaseCurl
         return preg_replace('/((\/\*[\s\S]*?\*\/)|(\/\/.*)|(#.*))|(\\n)/', "", $str);
     }
 
+    public function checkData($old,$new){
+        foreach ($new as $k=>$vo){
+            if(!empty($vo)){
+                $old[$k] = $vo;
+            }
+            if(!$old[$k]){
+                $old[$k] = $vo;
+            }
+        }
+
+        return $old;
+    }
+
+
+    /**   正则过渡，浪潮和曙光可用
+     * @param $key
+     * @param $str
+     * @return array
+     */
+
+    public function re($key,$str){
+        $re = "/$key :(.*?])/";
+        preg_match($re,$str,$arr);
+        if(!empty($arr)) {
+            $str2 = preg_replace('/\'/', '"', $arr[1]);
+            $arr2 = json_decode($str2, true);
+            if($arr2) return array_filter($arr2);
+
+        }
+        return [];
+    }
 
 }

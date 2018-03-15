@@ -50,11 +50,13 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
      */
     protected function getData()
     {
+
         $this->login();
         $this->getAllSensors(); //硬件监控
         $this->fru();  //fru信息
         $this->HWVersion(); //版本信息
         $this->getHWInfo(); //资产信息
+        $this->power();//资产电源
         $this->logout();
     }
 
@@ -71,24 +73,20 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
     public function fru(){
         $url = 'http://'.$this->ip.'/rpc/getfruinfo.asp';
         $str1 = $this->exec($url);
-
-        $re = '/\[([\s\S]*)\]/';
-        preg_match($re,$str1,$arr1);
-        if(!empty($arr1)){
-            preg_match('/{.*?}/',$arr1[1],$arr2);
-            if(!empty($arr2)){
-                $json = preg_replace('/\'/','"',$arr2[0]);
-                $arr = json_decode($json,true);
-                $fruOptions = [];
-                foreach ($arr as $k=>$vo){
-                    $k = strtoupper($k);
-                    $fruOptions[] = array(
-                        "{#{$k}}" => $k
-                    );
+        $key = 'WEBVAR_STRUCTNAME_HL_GETALLFRUINFO';
+        $fruArr=$this->re($key,$str1);
+        if( !empty($fruArr) && isset($fruArr[0]) ){
+            //只要部分数据
+            $tmp = array(
+                'FRUDeviceID','FRUDeviceName','PI_ProductInfoAreaFormatVersion','BI_MfgDateTime','BI_BoardMfr','BI_BoardProductName','PI_MfrName','PI_ProductName','PI_ProductVersion','PI_ProductSerialNum','PI_AssetTag'
+            );
+            $val=[];
+            foreach ($fruArr[0] as $k=> $vo){
+                if(in_array($k,$tmp)){
+                    $val[] = ['{#NAME}'=>strtoupper($k),'VALUE'=>$vo];
                 }
-                $this->allOptions =  ArrayHelper::merge($this->allOptions,$fruOptions);
-                $this->allData = ArrayHelper::merge($this->allData,$arr);
             }
+            $this->allData = ArrayHelper::merge($this->allData,['FRU'=>$val]);
         }
     }
 
@@ -96,6 +94,7 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
     public function HwVersion(){
         $url = 'http://'.$this->ip.'/rpc/HwVersion.asp';
         $str1 = $this->exec($url);
+
         //fpgaVersion  start
         $this->fpgaVersion($str1);
 
@@ -130,17 +129,16 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
     protected function fpgaVersion($str1){
         $key = 'WEBVAR_STRUCTNAME_FPGA_VERSION';
         $fpgaArr=$this->re($key,$str1);
-        $this->allOptions =  ArrayHelper::merge($this->allOptions,[["{#FPGAVERSION}"=>"FPGAVERSION"]]);
-        if($fpgaArr){
-            if(isset($fpgaArr[0]) && !empty($fpgaArr) ){
-                $fpgaVer  = '';
-                foreach ($fpgaArr[0] as $vo){
-                    $fpgaVer .= $vo.'.';
-                }
-                if($fpgaVer) $fpgaVer = substr($fpgaVer,0,-1);
-                $this->allData = ArrayHelper::merge($this->allData,[['FPGAVERSION'=>$fpgaVer]]);
+
+        if( !empty($fpgaArr) && isset($fpgaArr[0])){
+            $fpgaVer  = '';
+            foreach ($fpgaArr[0] as $vo){
+                $fpgaVer .= $vo.'.';
             }
+            if($fpgaVer) $fpgaVer = substr($fpgaVer,0,-1);
+            $this->allData = ArrayHelper::merge($this->allData,['FPGAVERSION'=>[['{#NAME}'=>'FPGAVERSION','VALUE'=>$fpgaVer]]]);
         }
+
     }
 
 
@@ -150,16 +148,11 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
     protected function biosVersion($str1){
         $key = 'WEBVAR_STRUCTNAME_BIOS_VERSION';
         $arr2=$this->re($key,$str1);
-
-        $this->allOptions =  ArrayHelper::merge($this->allOptions,[         ["{#BIOSVERSION}"=>"BIOSVERSION"],["{#BIOSBUILDTIME}"=>"BIOSBUILDTIME"]
-        ]);
-        if($arr2){
-            if( isset($arr2[0]) && !empty($arr2[0])   ){
-                $this->allData = ArrayHelper::merge($this->allData,[
-                    ["BIOSVERSION"=> $arr2[0]['BiosVersion'] ],["BIOSBUILDTIME"=>$arr2[0]['BiosBuildTime'] ]
-                ]);
-            }
+        if(!empty($arr2[0])&& isset($arr2[0]) ){
+            $this->allData = ArrayHelper::merge($this->allData,['BIOSVERSION'=>[['{#NAME}'=>'BIOSVERSION','VALUE'=>$arr2[0]['BiosVersion']]]]);
+//            ["BIOSBUILDTIME"=>$arr2[0]['BiosBuildTime'] ]
         }
+
 
     }
 
@@ -170,16 +163,12 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
     protected function meVersion($str1){
         $key = 'WEBVAR_STRUCTNAME_ME_VERSION';
         $arr2=$this->re($key,$str1);
-
-        $this->allOptions =  ArrayHelper::merge($this->allOptions,[["{#MEVERSION}"=>"MEVERSION"]
-        ]);
-        if($arr2){
-            if( isset($arr2[0]) && !empty($arr2[0])){
-                $this->allData = ArrayHelper::merge($this->allData,[
-                    ["MEVERSION"=> $arr2[0]['MEVersion'] ],
-                ]);
-            }
+        if( !empty($arr2[0]) && isset($arr2[0]) ){
+            $this->allData = ArrayHelper::merge($this->allData,[
+                'MEVERSION' =>[ ["{#NAME}"=>'MEVERSION','VALUE'=>$arr2[0]['MEVersion']],
+                ]]);
         }
+
     }
 
 
@@ -191,17 +180,18 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
         $key = 'WEBVAR_STRUCTNAME_FANPSOC_VERSION';
         $arr2=$this->re($key,$str1);
 
-        $this->allOptions =  ArrayHelper::merge($this->allOptions,[         ["{#FANPSOCVERSION}"=>"FANPSOCVERSION"],["{#HDDPSOCVERSION}"=>"HDDPSOCVERSION"]
-        ]);
-        if($arr2){
-            if( isset($arr2[0]) && !empty($arr2[0])   ){
-                $fanVer  = $arr2[0]['fanPsocVer0'].'.'.$arr2[0]['fanPsocVer1'].'.'.$arr2[0]['fanPsocVer2'];
-                $hddVer = $arr2[0]['hddPsocVer0'].'.'.$arr2[0]['hddPsocVer1'].'.'.$arr2[0]['hddPsocVer2'];
-                $this->allData = ArrayHelper::merge($this->allData,[
-                    ["FANPSOCVERSION"=> $fanVer ],["HDDPSOCVERSION"=> $hddVer ]
-                ]);
-            }
+        if( isset($arr2[0]) && !empty($arr2[0])   ){
+            $fanVer  = $arr2[0]['fanPsocVer0'].'.'.$arr2[0]['fanPsocVer1'].'.'.$arr2[0]['fanPsocVer2'];
+            $hddVer = $arr2[0]['hddPsocVer0'].'.'.$arr2[0]['hddPsocVer1'].'.'.$arr2[0]['hddPsocVer2'];
+
+            $this->allData = ArrayHelper::merge($this->allData,[
+                'FANPSOCVERSION' => [["{#NAME}"=>'FANPSOCVERSION','VALUE'=>$fanVer],
+                ]]);
+            $this->allData = ArrayHelper::merge($this->allData,[
+                'HDDPSOCVERSION' => [["{#NAME}"=>'HDDPSOCVERSION','VALUE'=>$hddVer],
+                ]]);
         }
+
     }
 
     /** mrb version
@@ -211,21 +201,19 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
         $key = 'WEBVAR_STRUCTNAME_MRB_VERSION';
         $arr2=$this->re($key,$str1);
         if( $arr2){
-            $mrbOptions = [];
-            $mrbValues = [];
+            $val = [];
             foreach ($arr2 as $k=>$vo ){
                 if(!empty($vo)){
-                    $key = 'MRBVERSION'.$k;
-                    $mrbOptions[] = [
-                        '{#MRBVERSION}' => $key
-                    ];
-                    $mrbValues[] = [
-                        $key => $vo['MRBVersion']
-                    ];
+                    $val[] = array(
+                        '{#NAME}' => 'MRBVERSION'.$k,
+                        'VALUE' => $vo['MRBVersion']
+                    );
                 }
             }
-            $this->allOptions =  ArrayHelper::merge($this->allOptions,$mrbOptions);
-            $this->allData = ArrayHelper::merge($this->allData,$mrbValues);
+
+            $this->allData = ArrayHelper::merge($this->allData,[
+                'MRBVERSION'=>$val
+            ]);
         }
     }
 
@@ -237,14 +225,14 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
         $key = 'WEBVAR_STRUCTNAME_CPUINFO';
         $arr2=$this->re($key,$str1);
         if($arr2){
-            $options = [];
+            $val = [];
             foreach ($arr2 as $vo){
                 if(!empty($vo)){
-                    $options[] = [ '{#CPUSOCKET}'=> strtoupper($vo['CPUSocket'])  ];
+                    $vo['{#NAME}'] = strtoupper($vo['CPUSocket']);
+                    $val[] = $vo;
                 }
             }
-            $this->allOptions =  ArrayHelper::merge($this->allOptions,$options);
-            $this->allData = ArrayHelper::merge($this->allData,$arr2);
+            $this->allData = ArrayHelper::merge($this->allData,['CPU'=>$val]);
         }
     }
 
@@ -255,14 +243,14 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
         $key = 'WEBVAR_STRUCTNAME_GETPCIEINFO';
         $arr2=$this->re($key,$str1);
         if($arr2){
-            $options = [];
+            $val = [];
             foreach ($arr2 as $vo){
                 if(!empty($vo)){
-                    $options[] = [ '{#PCIESLOT}'=> strtoupper($vo['PCIESlot']) ];
+                    $vo['{#NAME}'] = strtoupper($vo['PCIESlot']);
+                    $val[] = $vo;
                 }
             }
-            $this->allOptions =  ArrayHelper::merge($this->allOptions,$options);
-            $this->allData = ArrayHelper::merge($this->allData,$arr2);
+            $this->allData = ArrayHelper::merge($this->allData,['PCIE'=>$val]);
         }
     }
 
@@ -273,17 +261,37 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
         $key = 'WEBVAR_STRUCTNAME_GETMEMINFO';
         $arr2=$this->re($key,$str1);
         if($arr2){
-            $options = [];
+            $val = [];
             foreach ($arr2 as $vo){
                 if(!empty($vo)){
-                    $options[] = [ '{#MEMDIMM}'=> strtoupper($vo['MemDimm']) ];
+                    $vo['{#NAME}'] = strtoupper($vo['MemDimm']);
+                    $val[] = $vo;
                 }
             }
-            $this->allOptions =  ArrayHelper::merge($this->allOptions,$options);
-            $this->allData = ArrayHelper::merge($this->allData,$arr2);
+            $this->allData = ArrayHelper::merge($this->allData,['MEMORY'=>$val]);
         }
     }
 
+    /**资产信息 电源
+     * @param $str1
+     */
+    protected function power(){
+        $url = 'http://'.$this->ip.'/rpc/getallpsuinfo.asp';
+        $str1 = $this->exec($url);
+
+        $key = 'WEBVAR_STRUCTNAME_GETPSUINFO';
+        $arr2=$this->re($key,$str1);
+        if($arr2){
+            $val = [];
+            foreach ($arr2 as $vo){
+                if(!empty($vo)){
+                    $vo['{#NAME}'] = 'POWER'.strtoupper($vo['Id']);
+                    $val[] = $vo;
+                }
+            }
+            $this->allData = ArrayHelper::merge($this->allData,['POWER'=>$val]);
+        }
+    }
 
     /** SensorState（关闭）
      * 电压 2
@@ -297,7 +305,16 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
      * @param $key
      * @param $str
      * @return array|bool
+     * SensorState
+     * 0 关机
+     * 1 正常
+     *
+     * 0x8000
      */
+
+    public function decToHex($n){
+        return dechex($n/1000);
+    }
 
     public function hardWare($str1){
         $key = 'WEBVAR_STRUCTNAME_HL_GETALLSENSORS';
@@ -310,36 +327,53 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
             foreach ($arr2 as $vo) {
                 $type = $vo['SensorType'];
                 $k = '';
+                $state = 0;
+                if($vo['SensorState'] && $vo['SensorReading'] ){
+                    $state = 1;
+                }
                 switch ($type){
-                    case 1: $k = $word.'TEMP';break;
+                    case 1:
+                        $k = $word.'TEMP';
+                        if(!$state){
+                            if(!$vo['SensorReading'])$state = 0;
+                        }
+                        break;
                     case 2: $k = $word.'PV';break;
                     case 3: $k = $word.'AMP';break;
-                    case 4: $k = $word.'FAN';break;
-                    case 8: $k = $word.'POWER';break;
-                    case 13: $k = $word.'DRIVE';break;
-                    case 22: $k = $word.'CONTROL';break;
+                    case 4:
+                        $k = $word.'FAN';
+                        if(!$state){
+                            if($this->decToHex($vo['SensorReading'])==8001)$state = 0;
+                        }
+                        break;
+                    case 8:
+                        $k = $word.'POWER';
+                        if(!$state){
+                            $hex = $this->decToHex($vo['SensorReading']);
+                            if($hex==8001 || $hex==8009 || $hex==8081 || $hex==8089 )$state = 1;
+                        }
+                        break;
+                    case 13:
+                        $k = $word.'DRIVE';
+                        if(!$state){
+                            if($this->decToHex($vo['SensorReading'])==8001)$state = 1;
+                        }
+                        break;
+                    case 22:
+                        $k = $word.'CONTROL';
+                        if(!$state){
+                            if($this->decToHex($vo['SensorReading'])==8002)$state = 1;
+                            elseif($this->decToHex($vo['SensorReading'])==8001)$state = 0;
+                        }
+                        break;
                 }
-                $opt[] = [ '{#'.$k.'}' => strtoupper($vo['SensorName'])];
-                $vo[$k] = $vo['SensorName'];
-                $val[] =  $vo;
+
+                $vo['{#NAME}'] = strtoupper($vo['SensorName']);
+                $val[$k][] = $vo;
             }
-            $this->allOptions =  ArrayHelper::merge($this->allOptions,$opt);
             $this->allData = ArrayHelper::merge($this->allData,$val);
         }
 
-    }
-
-
-
-    public function re($key,$str){
-        $re = "/$key :(.*?])/";
-        preg_match($re,$str,$arr);
-        if(!empty($arr)) {
-            $str2 = preg_replace('/\'/', '"', $arr[1]);
-            $arr2 = json_decode($str2, true);
-            return $arr2 = array_filter($arr2);
-        }
-        return false;
     }
 
 
@@ -352,9 +386,17 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
         );
         curl_setopt($this->getClient(),CURLOPT_URL,$url);
         curl_setopt($this->getClient(),CURLOPT_COOKIE,$this->cookie);
-        curl_setopt($this->getClient(), CURLOPT_TIMEOUT, 20 );
+        curl_setopt($this->getClient(), CURLOPT_TIMEOUT, 10 );
         curl_setopt($this->getClient(), CURLOPT_HTTPHEADER, $headers);
         $res = curl_exec($this->getClient());
+
+        if(curl_errno($this->getClient()) == CURLE_OPERATION_TIMEDOUT)
+        {
+            $msg = '获取：'.$url.' 超时';
+            \Yii::error($msg);
+            //exit();
+            return null;
+        }
         return $this->removeMsg($res);
     }
 
@@ -362,59 +404,16 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
 
 
     protected function logout(){
-        $url = 'http://'.$this->ip.'/rpc/WEBSES/logout.asp';
-        curl_setopt($this->getClient(),CURLOPT_POST,0);
-        curl_setopt($this->getClient(),CURLOPT_URL,$url);
-        curl_exec($this->getClient());
-        curl_close($this->getClient());
-    }
-
-    /** 获取单个监控项的值
-     * @return mixed
-     */
-    public function getVal($key)
-    {
-        $arr = $this->run();
-        $data = $arr['data'];
-        $r = preg_replace('/{#|}/','',$key);
-        $rs = explode(".",$r);
-
         try{
-            if(count($rs)>1){
-                foreach ($data as $vo){
-                    if(is_array($vo)){
-                        foreach ($vo as $k=>$v){
-                            if(strtoupper($v)==$rs[0]){
-                                foreach ($vo as  $j=>$l){
-                                    if( strtoupper($j) == $rs[1]){
-                                        echo $l;exit();
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-            }
-            foreach ( $data as $k=>$vo){
-                if(is_array($vo)){
-                    foreach ($vo as $k1=>$v){
-                        if(strtoupper($k1)==$rs[0]){
-                            echo $v;exit();
-                        }
-                    }
-                }
-                if(!is_array($vo)){
-                    if( strtoupper($k) == $rs[0] ) {
-                        echo $vo;exit();
-                    }
-                }
-            }
-
+            $url = 'http://'.$this->ip.'/rpc/WEBSES/logout.asp';
+            //curl_setopt($this->getClient(),CURLOPT_POST,0);
+            curl_setopt($this->getClient(),CURLOPT_URL,$url);
+            curl_exec($this->getClient());
+            curl_close($this->getClient());
         }catch (Exception $e){
-            echo "NULL";
+
         }
-        echo "NULL";
+
     }
 
 

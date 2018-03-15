@@ -12,6 +12,7 @@ namespace app\commands;
 use app\components\Common;
 use yii\base\Exception;
 use yii\console\Controller;
+use yii\helpers\ArrayHelper;
 
 
 class SipderController extends Controller
@@ -28,51 +29,70 @@ class SipderController extends Controller
      * php_cli  /usr/local/src/first/yii sipder/options  10.240.240.79  admin  admin Inspurnf8480m4
      *                                                  ip          user    pwd     型号
      */
-    public function actionOptions(){
-        $get = $_SERVER['argv'];
 
+    public function actionComoptions(){
+        $get = $_SERVER['argv'];
         if(isset($get[2])) $ip = $get[2];
         if(isset($get[3])) $user = $get[3];
         if(isset($get[4])) $pwd = $get[4];
         if(isset($get[5])) $class = $get[5];
+        if(isset($get[6])) $options = $get[6];
 
         $class = ucfirst( strtolower($class) );
 
         $dir = Common::findClass($class);
         if (!$dir) echo json_encode(['data'=>[]]);
         $ch =  '\app\models\\'.$dir.'\\'.$class;
-
-        $curl = new  $ch($ip,$user,$pwd);
-
+        $curl = new  $ch($ip,$user,$pwd,$class);
         try{
             $data = $curl->run();
-            echo json_encode(['data'=>$data['options']]);
+            if(!empty($data)){
+                if(isset($data[$options])){
+                    $val = [];
+                    foreach ($data[$options] as $vo){
+                        $val[] = array(
+                            '{#NAME}' => $vo['{#NAME}']
+                        );
+                    }
+                    echo json_encode( ['data'=>$val] );exit();
+                }
+            }
         }catch (Exception $e){
-            echo json_encode(['data'=>[]]);
+
         }
+        echo json_encode( ['data'=>[]] );exit();
     }
 
-
-    public function actionData(){
+    public function actionComdatas(){
         $get = $_SERVER['argv'];
         if(isset($get[2])) $key = $get[2];
         if(isset($get[3])) $ip = $get[3];
         if(isset($get[4])) $user = $get[4];
         if(isset($get[5])) $pwd = $get[5];
         if(isset($get[6])) $class = $get[6];
+        if(isset($get[7])) $options = $get[7];
         $class = ucfirst( strtolower($class) );
 
         $dir = Common::findClass($class);
         if (!$dir) echo json_encode(['data'=>[]]);
         $ch =  '\app\models\\'.$dir.'\\'.$class;
-        $curl = new  $ch($ip,$user,$pwd);
+        $curl = new  $ch($ip,$user,$pwd,$class);
         $curl->getVal($key);
-
     }
 
 
+    public function actionProcess($ip,$user,$pwd,$class){
+        //file_put_contents('/usr/local/src/first/web/curl_data/a.txt','allen');
+        $get = $_SERVER['argv'];
+        if(isset($get[2])) $ip = $get[2];
+        if(isset($get[3])) $user = $get[3];
+        if(isset($get[4])) $pwd = $get[4];
+        if(isset($get[5])) $class = $get[5];
 
-
-
+        $dir = Common::findClass($class);
+        $ch =  '\app\models\\'.$dir.'\\'.$class;
+        $curl = new  $ch($ip,$user,$pwd,$class);
+        $curl->childProcess();
+    }
 
 }
