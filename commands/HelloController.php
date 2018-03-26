@@ -132,6 +132,12 @@ class HelloController extends Controller
     }
 
 
+    public function actionScript(){
+        $get = $_SERVER['argv'];
 
+        $path = '/usr/local/src/first/web/curl_data/a';
+
+        file_put_contents($path,json_encode($get));
+    }
 
 }

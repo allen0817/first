@@ -183,7 +183,9 @@ abstract class BaseCurl
 
             $file_json = file_get_contents($this->path);
             $file_arr = json_decode($file_json,true);
-            $new = $this->checkData($file_arr['data'],$this->allData);
+
+            if(empty($file_arr)) $new = $this->allData;
+            else $new = $this->checkData($file_arr['data'],$this->allData);
 
             $data =  [
                 'data' => $new,
