@@ -59,7 +59,8 @@ class Ucloudtc4600t extends  \app\components\BaseCurl
 
 
         $this->cpu();
-        //$this->pcie(); 这个值不知是什么意思先不要
+        $this->pcie(); //这个值不知是什么意思
+        $this->nic();
         $this->memory();
         $this->hdd();
         $this->logout();
@@ -129,13 +130,32 @@ class Ucloudtc4600t extends  \app\components\BaseCurl
             $val = [];
             foreach ($arr2 as $vo){
                 if(!empty($vo)){
-                    $vo['{#NAME}'] = strtoupper($vo['PCIESlot']);
+                    $vo['{#NAME}'] = 'PCIE'.$vo['pcieNo'];
                     $val[] = $vo;
                 }
             }
             $this->allData = ArrayHelper::merge($this->allData,['PCIE'=>$val]);
         }
     }
+
+    protected function nic(){
+        $url = 'http://'.$this->ip.'/rpc/sugon_get_offboardnic_info.asp';
+        $str1 = $this->exec($url);
+        $key = 'WEBVAR_STRUCTNAME_SUGONGETOFFBNICINFO';
+        $arr2=$this->re($key,$str1);
+        if($arr2){
+            $val = [];
+            foreach ($arr2 as $vo){
+                if(!empty($vo)){
+                    $vo['{#NAME}'] = 'NIC'.$vo['offBNicNo'];
+                    $vo['mac'] = strtoupper( dechex($vo['offBNicMac0'])).':'.strtoupper( dechex($vo['offBNicMac1'])).':'.strtoupper( dechex($vo['offBNicMac2'])).':'.strtoupper( dechex($vo['offBNicMac3'])).':'.strtoupper( dechex($vo['offBNicMac4'])).':'.strtoupper( dechex($vo['offBNicMac5']));
+                    $val[] = $vo;
+                }
+            }
+            $this->allData = ArrayHelper::merge($this->allData,['NIC'=>$val]);
+        }
+    }
+
 
     /**资产信息 内存
      * @param $str1

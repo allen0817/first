@@ -72,9 +72,7 @@ class SiteController extends Controller
     public function actionIndex()
     {
 
-        $file_arr = json_decode('',true);
-        print_r($file_arr);
-        if(isset($file_arr['a'])) echo 1;
+        echo strtoupper('0');
 
 
         die;
