@@ -178,6 +178,7 @@ abstract class BaseCurl
      */
 
     protected function childProcess(){
+        $this->check();
         $this->getData();
         if(!empty($this->allData)){
 
@@ -194,6 +195,25 @@ abstract class BaseCurl
             $this->save($data);
         }
         exit();
+    }
+
+
+    protected function check(){
+        $file = '/usr/local/src/first/web/curl_data/check';
+        $json = file_get_contents($file);
+        $arr = json_decode($json,true);
+
+        $k = $this->ip;
+
+        if (!isset($arr[$k])){
+            $arr[$k] = time();
+        }
+        elseif(isset($arr[$k]) && $arr[$k] + 300 < time()  ){
+            $arr[$k] = time();
+        }else{
+            exit();
+        }
+        file_put_contents($file,json_encode($arr));
     }
 
 

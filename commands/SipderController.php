@@ -95,4 +95,27 @@ class SipderController extends Controller
         $curl->childProcess();
     }
 
+    public function actionTest(){
+        $get = $_SERVER['argv'];
+        if(isset($get[2])) $ip = $get[2];
+        if(isset($get[3])) $user = $get[3];
+        if(isset($get[4])) $pwd = $get[4];
+        if(isset($get[5])) $class = $get[5];
+        if(isset($get[6])) $options = $get[6];
+
+        $class = ucfirst( strtolower($class) );
+
+        $dir = Common::findClass($class);
+        if (!$dir) echo json_encode(['data'=>[]]);
+        $ch =  '\app\models\\'.$dir.'\\'.$class;
+        $curl = new  $ch($ip,$user,$pwd,$class);
+        try{
+            $curl->getData();;
+
+        }catch (Exception $e){
+        }
+    }
+
+
+
 }

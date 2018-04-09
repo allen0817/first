@@ -5,7 +5,7 @@ return [
 
     //所有机器型号
     'versions' => [
-        'inspur','ibm','ucloud'
+        'inspur','ibm','ucloud','hp'
     ],
 
 ];

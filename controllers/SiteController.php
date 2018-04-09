@@ -3,6 +3,7 @@
 namespace app\controllers;
 
 
+use app\components\Common;
 use app\models\INSPUR\BaseCurl;
 use mongosoft\soapclient\Client;
 use Yii;
@@ -70,6 +71,21 @@ class SiteController extends Controller
 
     public function actionIndex()
     {
+
+        $file_arr = json_decode('',true);
+        print_r($file_arr);
+        if(isset($file_arr['a'])) echo 1;
+
+
+        die;
+
+        $str = '{"session_key":"dbbb82b47de4abae6fb6e9bbbc6e5b69","user_name":"admin","user_account":"admin","user_dn":"","user_type":"Local","user_ip":"192.168.100.110","user_expires":"Sat Apr 07 11:04:48 2018","login_priv":1,"remote_cons_priv":1,"virtual_media_priv":1,"reset_priv":1,"config_priv":1,"user_priv":1}';
+
+        echo "<pre>";
+        print_r(json_decode($str,true));die;
+
+
+
 
         $str = '<s:Fault><s:Code><s:Value>s:Sender</s:Value><s:Subcode><s:Value>wsa:ActionNotSupported</s:Value></s:Subcode></s:Code><s:Reason><s:Text xml:lang="en">The action is not supported by the service</s:Text></s:Reason><s:Detail><wsa:Action>http://www.ibm.com/iBMC/sp/Monitors/GetSPNameSettings</wsa:Action><wsman:FaultDetail>http://schemas.dmtf.org/wbem/wsman/1/wsman/faultDetail/ActionMismatch</wsman:FaultDetail></s:Detail></s:Fault>';
 
