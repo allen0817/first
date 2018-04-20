@@ -34,7 +34,7 @@ abstract class BaseCurl
     static $timeOut = 300;//缓存时间 s
 
     //文件缓存目录
-    static $BASE_PATH = '/usr/local/src/first/web/curl_data/';
+    static $BASE_PATH = '/usr/local/src/php_script/first/web/curl_data/';
 
     protected $path;
 

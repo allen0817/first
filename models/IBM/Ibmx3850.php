@@ -169,7 +169,7 @@ class Ibmx3850 extends \app\components\BaseCurl
             $voltage= $res['SensorInfo']['Voltage'];
             $val = [];
             foreach ($voltage as $k=>$vo){
-                $vo['{#NAME}'] = $this->removeKongAndUp($vo['Component']);
+                $vo['{#NAME}'] = str_replace('.','-', $this->removeKongAndUp($vo['Component']));
                 $val[] = $vo;
             }
             $this->allData = ArrayHelper::merge($this->allData,['VOLTAGE'=>$val]);
@@ -262,7 +262,7 @@ class Ibmx3850 extends \app\components\BaseCurl
             $vlh= $res['VirtualLightPathArray']['VirtualLightPath'];
             $val = [];
             foreach ($vlh as $k=>$vo){
-                $vo['{#NAME}'] = $this->removeKongAndUp($vo['Name']);
+                $vo['{#NAME}'] = 'LH'.$this->removeKongAndUp($vo['Name']);
                 $val[] = $vo;
             }
             $this->allData = ArrayHelper::merge($this->allData,['LIGHTPATH'=>$val]);
