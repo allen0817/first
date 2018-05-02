@@ -36,6 +36,9 @@ abstract class BaseCurl
     //文件缓存目录
     static $BASE_PATH = '/usr/local/src/php_script/first/web/curl_data/';
 
+    //上海 根目录 /usr/local/src/php_script/first
+    //北京 根目录  /usr/local/src/first/
+
     protected $path;
 
     /**
@@ -140,13 +143,13 @@ abstract class BaseCurl
             $file_json = file_get_contents($this->path);
             $file_arr = json_decode($file_json,true);
             if($file_arr['time'] + self::$timeOut < time() ){ //超时
-
+                //file_put_contents(static::$BASE_PATH.'a.txt',date('Y-m-d'));
                 $pid= pcntl_fork();
                 if ($pid == -1) {
                     die('could not fork');
                 }elseif (!$pid) {
                     //这里是子进程
-                    //$this->childProcess($file_arr);
+                    //   /usr/local/src/php_script/first/yii
                     $params = ' '.$this->ip .' '.$this->user .' '.$this->pwd .' '. $this->class;
                     shell_exec("php  /usr/local/src/first/yii sipder/process   $params  > /dev/null 2>&1 & ");
                     exit();
@@ -177,7 +180,7 @@ abstract class BaseCurl
      * @param $file_arr
      */
 
-    protected function childProcess(){
+    public function childProcess(){
         $this->check();
         $this->getData();
         if(!empty($this->allData)){
@@ -199,7 +202,9 @@ abstract class BaseCurl
 
 
     protected function check(){
-        $file = '/usr/local/src/first/web/curl_data/check';
+        //  /usr/local/src/php_script/first/web/curl_data/check
+        //$file = '/usr/local/src/first/web/curl_data/check';
+        $file = static::$BASE_PATH.'check';
         $json = file_get_contents($file);
         $arr = json_decode($json,true);
 

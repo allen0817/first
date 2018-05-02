@@ -279,7 +279,8 @@ class Ucloudtc4600t extends  \app\components\BaseCurl
     protected function logout(){
         try{
             $url = 'http://'.$this->ip.'/rpc/WEBSES/logout.asp';
-            //curl_setopt($this->getClient(),CURLOPT_POST,0);
+            curl_setopt($this->getClient(),CURLOPT_POST,0);
+			curl_setopt($this->getClient(),CURLOPT_COOKIE,$this->cookie);
             curl_setopt($this->getClient(),CURLOPT_URL,$url);
             curl_exec($this->getClient());
             curl_close($this->getClient());

@@ -11,7 +11,7 @@ namespace app\models\HP;
 
 use yii\base\Exception;
 use yii\helpers\ArrayHelper;
-
+use app\models\HP\Hpdl580;
 
 //380 与 580 一致
 class Hpdl380 extends  Hpdl580

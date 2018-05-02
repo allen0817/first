@@ -89,6 +89,8 @@ class SipderController extends Controller
         if(isset($get[4])) $pwd = $get[4];
         if(isset($get[5])) $class = $get[5];
 
+        $class = ucfirst( strtolower($class) );
+
         $dir = Common::findClass($class);
         $ch =  '\app\models\\'.$dir.'\\'.$class;
         $curl = new  $ch($ip,$user,$pwd,$class);
