@@ -293,6 +293,11 @@ abstract class BaseCurl
      */
     public function resetBmc()
     {
+        $file_json = file_get_contents($this->path);
+        $file_arr = json_decode($file_json,true);
+        @$file_arr['data']['local']['bmc'] = 0;
+        @$this->save($file_arr);
+
         $command = "ipmitool -I lan -H $this->ip -U $this->user -P $this->pwd mc reset warm";
         exec($command);  
     }

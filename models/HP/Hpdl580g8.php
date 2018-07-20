@@ -45,6 +45,8 @@ class Hpdl580g8 extends  \app\components\BaseCurl
         }
         else{
             \Yii::error($this->ip.' login error');
+            $this->resetBmc();//重启BMC
+            exit();
         }
     }
 
@@ -102,6 +104,7 @@ class Hpdl580g8 extends  \app\components\BaseCurl
                 'product.version' => $arr['ilo_fw_version'],
                 'dev.ip' => $arr['ip_address'],
             );
+            $get['bmc'] = 1; //能采集数据，bmc一定能登录
             $get['dev.timezone'] = $this->getTimeZone();
             $this->allData = ArrayHelper::merge($this->allData,['local'=>$get]);
         }

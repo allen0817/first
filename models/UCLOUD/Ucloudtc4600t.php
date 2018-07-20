@@ -45,10 +45,6 @@ class Ucloudtc4600t extends  \app\components\BaseCurl
             }
         }else{
             \Yii::error($this->ip.' login error');
-            $file_json = file_get_contents($this->path);
-            $file_arr = json_decode($file_json,true);
-            @$file_arr['data']['local']['bmc'] = 0;
-            @$this->save($file_arr);
             $this->resetBmc();//重启BMC
             exit();
         }
@@ -628,9 +624,6 @@ class Ucloudtc4600t extends  \app\components\BaseCurl
             $this->allData = ArrayHelper::merge($this->allData,['disk'=>$val]);
         }
     }
-
-
-
 
     public function hardWare($str1){
         $key = 'WEBVAR_STRUCTNAME_HL_GETALLSENSORS';

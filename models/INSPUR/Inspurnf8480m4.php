@@ -42,6 +42,10 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
 
             $this->csrfToken = $arr[0]['CSRFTOKEN'];
             $this->auth = true;
+        }else{
+            \Yii::error($this->ip.' login error');
+            $this->resetBmc();//重启BMC
+            exit();
         }
     }
 
@@ -88,6 +92,7 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
                 'product.version' => $fruArr[0]['PI_ProductVersion'],
             );
         }
+        $val['bmc'] = 1; //能采集数据，bmc一定能登录
         $val['dev.timezone'] = $this->timezone();
         $this->allData = ArrayHelper::merge($this->allData,['local'=>$val]);
     }

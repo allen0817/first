@@ -40,6 +40,10 @@ class Ibmx3850 extends \app\components\BaseCurl
                 $this->auth = true;
                 $this->cookie = "HideIPv6WhenDisabled=0; session_id=".$c[1];
             }
+        }else{
+            \Yii::error($this->ip.' login error');
+            $this->resetBmc();//重启BMC
+            exit();
         }
     }
 
@@ -225,6 +229,7 @@ class Ibmx3850 extends \app\components\BaseCurl
                 $name = strtolower($vo['FirmwareName']);
                 $val[$name] = $vo['VersionString'];
             }
+            $val['bmc'] = 1; //能采集数据，bmc一定能登录
             $this->allData = ArrayHelper::merge($this->allData,['local'=>$val]);
         }
 

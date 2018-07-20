@@ -47,6 +47,8 @@ class Hpdl380g7 extends  \app\components\BaseCurl
         }
         else{
             \Yii::error($this->ip.' login error');
+            $this->resetBmc();//重启BMC
+            exit();
         }
     }
 
@@ -104,6 +106,7 @@ class Hpdl380g7 extends  \app\components\BaseCurl
                 'dev.ip' => $arr['ip_address'],
             );
         }
+        $get['bmc'] = 1; //能采集数据，bmc一定能登录
         $get['dev.timezone'] = $this->getTimeZone();
         $this->allData = ArrayHelper::merge($this->allData,['local'=>$get]);
     }
