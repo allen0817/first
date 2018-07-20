@@ -67,7 +67,8 @@ class Ibmx3850 extends \app\components\BaseCurl
      * @return string
      */
     public function removeKongAndUp($key){
-        return strtoupper( str_replace(' ','',$key)  );
+        //return strtoupper( str_replace(' ','',$key)  );
+        return str_replace(' ','',$key);
     }
 
     /**
@@ -87,13 +88,13 @@ class Ibmx3850 extends \app\components\BaseCurl
     protected function getData()
     {
         $this->login();
-        $this->getName();
+        //$this->getName();
         $this->getMemory();
-        $this->getSensor();
+        //$this->getSensor();
         $this->getVital();
         $this->getProcessor();
-        $this->getHostMac();
-        $this->getVirtualLightPath();
+        $this->getNic();
+        //$this->getVirtualLightPath();
         $this->logout();
     }
 
@@ -135,6 +136,21 @@ class Ibmx3850 extends \app\components\BaseCurl
         }
     }
 
+    public function getNic(){
+        $param = $this->getUrl('GetHostMacAddresses');
+        $res = $this->exec($param);
+        if(isset($res['HostMACaddress'])){
+            $HostMaddr= $res['HostMACaddress']['HostMaddr'];
+            $val = [];
+            foreach ($HostMaddr as $k=>$vo){
+                $vo['{#NAME}'] = 'nic'.$k;
+                $vo['ifMACAdEntIfIndex'] = $vo['Address'];
+                $val[] = $vo;
+            }
+            $this->allData = ArrayHelper::merge($this->allData,['nic'=>$val]);
+        }
+    }
+
 
     public function getMemory(){
         $param = $this->getUrl('GetMemoryInfo');
@@ -143,9 +159,12 @@ class Ibmx3850 extends \app\components\BaseCurl
             $val = [];
             foreach ($res['Memory']['MemoryInfo'] as $vo){
                 $vo['{#NAME}'] = $this->removeKongAndUp($vo['Description']);
+                $vo['memory.serial'] = $vo['SerialNumber'];
+                $vo['memory.type'] = $vo['Type'];
+                $vo['memory.size'] = $vo['Size']; // G
                 $val[] = $vo;
             }
-            $this->allData = ArrayHelper::merge($this->allData,['MEMORY' => $val]);
+            $this->allData = ArrayHelper::merge($this->allData,['memory' => $val]);
         }
     }
 
@@ -186,6 +205,8 @@ class Ibmx3850 extends \app\components\BaseCurl
 
     }
 
+
+    //系统信息 local
     public function getVital(){
         $param = $this->getUrl('GetVitalProductData');
         $res = $this->exec($param);
@@ -195,32 +216,16 @@ class Ibmx3850 extends \app\components\BaseCurl
             $mlv= $res['GetVitalProductDataResponse']['MachineLevelVPD'];
             $val = [];
 
-            foreach ($mlv as $k=>$vo){
-                $val[] = array(
-                    '{#NAME}' => $this->removeKongAndUp($k),
-                    'VALUE' => $vo
-                );
-            }
-            $this->allData = ArrayHelper::merge($this->allData,['MACHINE'=>$val]);
-
-
-            $clv= $res['GetVitalProductDataResponse']['ComponentLevelVPD'];
-            $val = [];
-            foreach ($clv as $k=>$vo){
-                $vo['{#NAME}'] = $this->removeKongAndUp($vo['FRUName']);
-                $val[] = $vo;
-            }
-            $this->allData = ArrayHelper::merge($this->allData,['FRU'=>$val]);
-
-
+            $val['product.name'] = $mlv['ProductName'];
+            $val['product.serial'] = $mlv['SerialNumber'];
+            $val['product.version'] = $mlv['MachineTypeAndModel'];
+            $val['uuid'] = $mlv['UUID'];
             $vpd= $res['GetVitalProductDataResponse']['VPD'];
-            $val = [];
             foreach ($vpd as $k=>$vo){
-                $vo['{#NAME}'] = $this->removeKongAndUp($vo['FirmwareName']);
-                $val[] = $vo;
-
+                $name = strtolower($vo['FirmwareName']);
+                $val[$name] = $vo['VersionString'];
             }
-            $this->allData = ArrayHelper::merge($this->allData,['FIRMWARE'=>$val]);
+            $this->allData = ArrayHelper::merge($this->allData,['local'=>$val]);
         }
 
 
@@ -234,26 +239,21 @@ class Ibmx3850 extends \app\components\BaseCurl
             $val = [];
             foreach ($process as $k=>$vo){
                 $vo['{#NAME}'] = $this->removeKongAndUp($vo['Description']);
+                $vo['cpu.frequency'] = $vo['Speed'];
+                $vo['cpu.serial'] = $vo['Identifier'];
+                $vo['cpu.type'] = $vo['Type'];
+                $vo['cpu.mfc'] = $vo['Family'];
+                $vo['cpu.core'] = $vo['Cores'];
+                $vo['cpu.thread'] = $vo['Threads'];
+                $vo['cpu.qpi.width'] = $vo['Datawidth'];
                 $val[] = $vo;
             }
-            $this->allData = ArrayHelper::merge($this->allData,['PROCESSOR'=>$val]);
+            $this->allData = ArrayHelper::merge($this->allData,['cpu'=>$val]);
         }
     }
 
-    public function getHostMac(){
-        $param = $this->getUrl('GetHostMacAddresses');
-        $res = $this->exec($param);
-        if(!empty($res)){
-            $HostMaddr= $res['HostMACaddress']['HostMaddr'];
-            $val = [];
-            foreach ($HostMaddr as $k=>$vo){
-                $vo['{#NAME}'] = $this->removeKongAndUp($vo['Description']);
-                $val[] = $vo;
-            }
-            $this->allData = ArrayHelper::merge($this->allData,['MAC'=>$val]);
-        }
 
-    }
+
 
     public function getVirtualLightPath(){
         $param = $this->getUrl('GetVirtualLightPath');

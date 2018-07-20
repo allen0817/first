@@ -13,7 +13,7 @@ use yii\base\Exception;
 use yii\helpers\ArrayHelper;
 use yii\web\Response;
 
-class Hp01 extends  \app\components\BaseCurl
+class Hpdl380g7 extends  \app\components\BaseCurl
 {
     protected function login()
     {
@@ -23,7 +23,12 @@ class Hp01 extends  \app\components\BaseCurl
         curl_setopt($this->getClient(),CURLOPT_URL,$url);
         curl_setopt($this->getClient(),CURLOPT_POST,1);
 
-        curl_setopt($this->getClient(), CURLOPT_POSTFIELDS,'{"method":"login","user_login":"admin","password":"ctsicloud123"}');
+        $info =  array(
+            'method' => 'login',
+            'user_login' => $this->user,
+            'password' => $this->pwd
+        );
+        curl_setopt($this->getClient(), CURLOPT_POSTFIELDS,json_encode($info));
         curl_setopt($this->getClient(),CURLOPT_COOKIE,$cookie);
 
         $res = curl_exec($this->getClient());
@@ -35,14 +40,10 @@ class Hp01 extends  \app\components\BaseCurl
         if(isset($arr['session_key'])){
             $this->cookie .= 'sessionKey='.$arr['session_key'];
             $this->cookie .=';sessionUrl=https://172.16.253.71/';
-
             $this->cookie .=';sessionLang=en';
-
-
 
             $this->auth = true;
             $this->csrfToken = $arr['session_key'];
-
         }
         else{
             \Yii::error($this->ip.' login error');
@@ -55,35 +56,24 @@ class Hp01 extends  \app\components\BaseCurl
     protected function getData()
     {
         $this->login();
-
-        $this->healthSummary();
-
-/*        $this->healthFans();
-
-        $this->temp();
-        $this->sup();
-
-        $this->powerReading();
-
+        //$this->healthSummary();
+        $this->sysInfo();
+        //$this->healthFans();
+        //$this->temp();
+        //$this->sup(); //电池
+        //$this->powerReading(); //总功率
         $this->proc();
-
         $this->mem();
-
         $this->nic();
-
-        $this->drive();*/
-
+        //$this->drive();
+        //$this->firmware();
         $this->logout();
 
     }
 
 
-
-
-
-
     //health_summary 总概
-    public function healthSummary(){
+    protected function healthSummary(){
         $url = 'https://'.$this->ip.'/json/health_summary?_='.time().'&null';
         $arr = $this->exec($url);
         if ($arr){
@@ -101,31 +91,50 @@ class Hp01 extends  \app\components\BaseCurl
     }
 
     //系统信息
-    public function sysInfo(){
+    protected function sysInfo(){
         $url = 'https://'.$this->ip.'/json/overview?_='.time().'&null';
         $arr = $this->exec($url);
+        $get = [];
         if ($arr){
-            $val = [];
-            foreach ($arr as $k=>$vo){
-                $t = [];
-                if(!empty($vo)){
-                    $t['{#NAME}'] = $this->replaceToUpper($k);
-                    $t['VALUE'] = $vo;
-                    $val[] = $t;
+            $get = array(
+                'product.serial'  => $arr['serial_num'],
+                'product.name' => $arr['product_name'],
+                'uuid'=>$arr['uuid'],
+                'product.version' => $arr['ilo_fw_version'],
+                'dev.ip' => $arr['ip_address'],
+            );
+        }
+        $get['dev.timezone'] = $this->getTimeZone();
+        $this->allData = ArrayHelper::merge($this->allData,['local'=>$get]);
+    }
+
+    protected function getTimeZone(){
+        $url = 'https://'.$this->ip.'/json/network_sntp/interface/0?_='.time().'&null';
+        $arr = $this->exec($url);
+        if ($arr){
+            $id =  $arr['our_zone'];
+            $path =  \Yii::getAlias('@app').'/models/HP/timezone.txt';
+            $file = file_get_contents($path);
+            $arr = json_decode($file,true);
+            foreach ($arr['zones'] as $vo){
+                if($vo['index'] == $id){
+                    return $vo['name'];
                 }
             }
-            $this->allData = ArrayHelper::merge($this->allData,['SYS'=>$val]);
         }
+        return '';
     }
 
 
-    public function replaceToUpper($str){
-        return strtoupper ( str_replace(' ','',$str) );
+    protected function replaceToUpper($str){
+        $str = preg_replace("/\s*|\(|\)/",'',$str);
+        //return strtoupper ( $str );
+        return $str;
     }
 
 
     //风扇
-    public function healthFans(){
+    protected function healthFans(){
         $url = 'https://'.$this->ip.'/json/health_fans?_='.time().'&null';
         $arr = $this->exec($url);
         if ($arr){
@@ -137,12 +146,12 @@ class Hp01 extends  \app\components\BaseCurl
                     $val[] = $vo;
                 }
             }
-            $this->allData = ArrayHelper::merge($this->allData,['FAN'=>$val]);
+            $this->allData = ArrayHelper::merge($this->allData,['fan'=>$val]);
         }
     }
 
     //温度
-    public function temp(){
+    protected function temp(){
         $url = 'https://'.$this->ip.'/json/health_temperature?_='.time().'&null';
         $arr = $this->exec($url);
         if ($arr){
@@ -154,12 +163,13 @@ class Hp01 extends  \app\components\BaseCurl
                     $val[] = $vo;
                 }
             }
-            $this->allData = ArrayHelper::merge($this->allData,['TEMP'=>$val]);
+            $this->allData = ArrayHelper::merge($this->allData,['temp'=>$val]);
 
         }
     }
 
-    public function sup(){
+    //电池
+    protected function sup(){
         $url = 'https://'.$this->ip.'/json/power_supplies?_='.time().'&null';
         $arr = $this->exec($url);
         if ($arr){
@@ -167,7 +177,7 @@ class Hp01 extends  \app\components\BaseCurl
             $arr2 = $arr['supplies'];
             foreach ($arr2 as $k=> $vo){
                 if(!empty($vo)){
-                    $vo['{#NAME}'] = 'SUP'.$k;
+                    $vo['{#NAME}'] = 'POWERSUPPLIES'.$k;
                     $val[] = $vo;
                 }
             }
@@ -175,7 +185,8 @@ class Hp01 extends  \app\components\BaseCurl
         }
     }
 
-    public function powerReading(){
+    //总功率
+    protected function powerReading(){
         $url = 'https://'.$this->ip.'/json/power_readings?_='.time().'&null';
         $arr = $this->exec($url);
         if ($arr){
@@ -186,7 +197,8 @@ class Hp01 extends  \app\components\BaseCurl
     }
 
 
-    public function proc(){
+    //cpu
+    protected function proc(){
         $url = 'https://'.$this->ip.'/json/proc_info?_='.time().'&null';
         $arr = $this->exec($url);
         if ($arr){
@@ -194,31 +206,44 @@ class Hp01 extends  \app\components\BaseCurl
             $arr2 = $arr['processors'];
             foreach ($arr2 as $k=> $vo){
                 if(!empty($vo)){
-                    $vo['{#NAME}'] = $this->replaceToUpper($vo['proc_socket']);
-                    $val[] = $vo;
+                    $val[] = ArrayHelper::merge($vo,[
+                        'cpu.frequency' => $vo['proc_speed'],
+                        'cpu.name' => $this->replaceToUpper($vo['proc_socket']),
+                        'cpu.core' => $vo['proc_num_cores'],
+                        'cpu.thread' =>  $vo['proc_num_threads'],
+                        'cpu.qpi.width' => $vo['proc_mem_technology'],
+                        'cpu.l1.cache' => $vo['proc_num_l1cache']*1024,
+                        'cpu.l2.cache' => $vo['proc_num_l2cache']*1024,
+                        'cpu.l3.cache' => $vo['proc_num_l3cache']*1024,
+                        '{#NAME}' => 'CPU'.$k,
+                    ]);
                 }
             }
-            $this->allData = ArrayHelper::merge($this->allData,['PROC'=>$val]);
+            $this->allData = ArrayHelper::merge($this->allData,['cpu'=>$val]);
         }
     }
 
-    public function mem(){
+    //Memory Details:mem_modules
+    protected function mem(){
         $url = 'https://'.$this->ip.'/json/mem_info?_='.time().'&null';
         $arr = $this->exec($url);
         if ($arr){
             $val = [];
             $arr2 = $arr['memory'];
             foreach ($arr2 as $k=> $vo){
-                if(!empty($vo)){
+                if($vo){
                     $vo['{#NAME}'] = $this->replaceToUpper($vo['mem_dev_loc']);
+                    $vo['memory.frequency'] = $vo['mem_speed'];
+                    $vo['memory.size.total'] = $vo['mem_size'];  //  8192 MB
                     $val[] = $vo;
                 }
             }
-            $this->allData = ArrayHelper::merge($this->allData,['MEM'=>$val]);
+            $this->allData = ArrayHelper::merge($this->allData,['memory'=>$val]);
         }
     }
 
-    public function nic(){
+    //网卡
+    protected function nic(){
         $url = 'https://'.$this->ip.'/json/nic_info?_='.time().'&null';
         $arr = $this->exec($url);
         if ($arr){
@@ -226,15 +251,36 @@ class Hp01 extends  \app\components\BaseCurl
             $arr2 = $arr['nics'];
             foreach ($arr2 as $k=> $vo){
                 if(!empty($vo)){
-                    $vo['{#NAME}'] = 'NIC'.$vo['port_num'];
+                    $vo['{#NAME}'] = 'nic'.$k;
+                    $vo['net.ifPhysAddress'] = $vo['mac_addr'];
+                    $vo['net.ifType'] = $vo['dev_type'];
                     $val[] = $vo;
                 }
             }
-            $this->allData = ArrayHelper::merge($this->allData,['NIC'=>$val]);
+            $this->allData = ArrayHelper::merge($this->allData,['nic'=>$val]);
         }
     }
 
-    public function drive(){
+    //固件版本
+    protected function firmware(){
+        $url = 'https://'.$this->ip.'/json/fw_info?_='.time().'&null';
+        $arr = $this->exec($url);
+        if ($arr){
+            $val = [];
+            $arr2 = $arr['firmware'];
+            foreach ($arr2 as $k=> $vo){
+                $t = [];
+                if(!empty($vo)){
+                    $t['{#NAME}'] = $this->replaceToUpper($vo['fw_name']);
+                    $t['VALUE'] = $vo['fw_version'];
+                    $val[] = $t;
+                }
+            }
+            $this->allData = ArrayHelper::merge($this->allData,['FIRMWARE'=>$val]);
+        }
+    }
+
+    protected function drive(){
         $url = 'https://'.$this->ip.'/json/drives_status?_='.time().'&null';
         $arr = $this->exec($url);
         if ($arr){
@@ -243,16 +289,14 @@ class Hp01 extends  \app\components\BaseCurl
             foreach ($arr2 as $g=> $vo){
                 if(!empty($vo['bays'])){
                     foreach ($vo['bays'] as $k=>$v){
-                        $v['{#NAME}'] = 'GROUP'.$g.'bay'.$v['bay_number'];
+                        $v['{#NAME}'] =  'GROUP'.$g.'BAY'.$v['bay_number'];
                         $val[] = $v;
                     }
                 }
             }
             $this->allData = ArrayHelper::merge($this->allData,['DRIVE'=>$val]);
-            print_r($val);
         }
     }
-
 
     protected function exec($url){
         //\Yii::$app->response->format = Response::FORMAT_JSON;
@@ -260,7 +304,7 @@ class Hp01 extends  \app\components\BaseCurl
             $this->login();
         }
         $headers = array(
-            'Host: 172.16.253.71',
+            "Host: $this->ip",
             'User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36',
             'X-Requested-With: XMLHttpRequest'
         );
@@ -277,9 +321,10 @@ class Hp01 extends  \app\components\BaseCurl
             \Yii::error($msg);
             return null;
         }
-        return json_decode($res,true);
+        $arr = json_decode($res,true);
+        if(!isset($arr['message'])) return $arr;
+        else return null;
     }
-
 
 
 

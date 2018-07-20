@@ -19,6 +19,8 @@ abstract class BaseCurl
     protected $user;
     protected $pwd;
 
+    protected $port;
+
     protected $class;
 
     protected $cookie;
@@ -34,7 +36,7 @@ abstract class BaseCurl
     static $timeOut = 300;//缓存时间 s
 
     //文件缓存目录
-    static $BASE_PATH = '/usr/local/src/php_script/first/web/curl_data/';
+    static $BASE_PATH = '/usr/local/src/first/web/curl_data/';
 
     //上海 根目录 /usr/local/src/php_script/first
     //北京 根目录  /usr/local/src/first/
@@ -46,11 +48,12 @@ abstract class BaseCurl
      * @return $this
      */
 
-    public function __construct($ip,$user,$pwd,$class)
+    public function __construct($ip,$user,$pwd,$class,$port=80)
     {
         $this->ip = $ip;
         $this->user = $user;
         $this->pwd = $pwd;
+        $this->port = $port;
 
         $this->class = $class;
 
@@ -67,12 +70,22 @@ abstract class BaseCurl
     }
 
     private  function createClient(){
+        $head = array(
+            'Connection:keep-alive',
+        );
+
+
         $this->_client = curl_init();
         curl_setopt($this->_client,CURLOPT_POST,1);
         curl_setopt($this->_client,CURLOPT_SSL_VERIFYPEER,false);
         curl_setopt($this->_client,CURLOPT_SSL_VERIFYHOST,0);
         curl_setopt($this->_client,CURLOPT_HEADER,0);
         curl_setopt($this->_client,CURLOPT_RETURNTRANSFER,1);
+        curl_setopt($this->_client, CURLOPT_CUSTOMREQUEST, 'POST');
+        curl_setopt($this->_client, CURLOPT_FOLLOWLOCATION, 1);
+        curl_setopt($this->_client, CURLOPT_AUTOREFERER, 1);
+        curl_setopt($this->_client, CURLOPT_COOKIESESSION, 1);
+
         return $this->_client;
     }
 
@@ -136,25 +149,22 @@ abstract class BaseCurl
         echo 'null';exit();
     }
 
-
-
     public  function run(){
         if(file_exists($this->path)){
             $file_json = file_get_contents($this->path);
             $file_arr = json_decode($file_json,true);
             if($file_arr['time'] + self::$timeOut < time() ){ //超时
-                //file_put_contents(static::$BASE_PATH.'a.txt',date('Y-m-d'));
                 $pid= pcntl_fork();
                 if ($pid == -1) {
                     die('could not fork');
                 }elseif (!$pid) {
-                    //这里是子进程
-                    //   /usr/local/src/php_script/first/yii
+                    //手动释放内存
+                    $file_json = null;
+                    $file_arr = null;
                     $params = ' '.$this->ip .' '.$this->user .' '.$this->pwd .' '. $this->class;
                     shell_exec("php  /usr/local/src/first/yii sipder/process   $params  > /dev/null 2>&1 & ");
                     exit();
                 }
-
             }
             return $file_arr['data'];
         }else{//第一次
@@ -179,18 +189,14 @@ abstract class BaseCurl
     /** 子进程获取数据
      * @param $file_arr
      */
-
     public function childProcess(){
         $this->check();
         $this->getData();
         if(!empty($this->allData)){
-
             $file_json = file_get_contents($this->path);
             $file_arr = json_decode($file_json,true);
-
             if(empty($file_arr)) $new = $this->allData;
             else $new = $this->checkData($file_arr['data'],$this->allData);
-
             $data =  [
                 'data' => $new,
                 'time' => time(),
@@ -199,7 +205,6 @@ abstract class BaseCurl
         }
         exit();
     }
-
 
     protected function check(){
         //  /usr/local/src/php_script/first/web/curl_data/check
@@ -282,5 +287,15 @@ abstract class BaseCurl
         }
         return [];
     }
+
+    /**
+     * 重启BMC
+     */
+    public function resetBmc()
+    {
+        $command = "ipmitool -I lan -H $this->ip -U $this->user -P $this->pwd mc reset warm";
+        exec($command);  
+    }
+
 
 }

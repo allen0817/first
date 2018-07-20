@@ -13,7 +13,7 @@ use yii\base\Exception;
 use yii\helpers\ArrayHelper;
 use yii\web\Response;
 
-class Hpdl580 extends  \app\components\BaseCurl
+class Hpdl380g8 extends  \app\components\BaseCurl
 {
     protected function login()
     {
@@ -56,17 +56,17 @@ class Hpdl580 extends  \app\components\BaseCurl
     protected function getData()
     {
         $this->login();
-        $this->healthSummary();
+        //$this->healthSummary();
         $this->sysInfo();
-        $this->healthFans();
+        //$this->healthFans();
         //$this->temp();
-        $this->sup(); //电池
+        //$this->sup(); //电池
         //$this->powerReading(); //总功率
         $this->proc();
         $this->mem();
         $this->nic();
         //$this->drive();
-        $this->firmware();
+        //$this->firmware();
         $this->logout();
 
     }
@@ -94,40 +94,42 @@ class Hpdl580 extends  \app\components\BaseCurl
     protected function sysInfo(){
         $url = 'https://'.$this->ip.'/json/overview?_='.time().'&null';
         $arr = $this->exec($url);
+        $get = [];
         if ($arr){
             $get = array(
-                //$arr['product_name'],
-                //$arr['serial_num'],
-                //$arr['product_id'],
+                'product.serial'  => $arr['serial_num'],
+                'product.name' => $arr['product_name'],
                 'uuid'=>$arr['uuid'],
-                'system_rom'=>$arr['system_rom'],
-                'system_rom_date'=>$arr['system_rom_date'],
-                'backup_rom_date'=>$arr['backup_rom_date'],
-                'license'=>$arr['license'],
-                'ilo_fw_version'=>$arr['ilo_fw_version'],
-                'ip_address'=>$arr['ip_address'],
-                'ipv6_link_local'=>$arr['ipv6_link_local'],
-                'system_health'=>$arr['system_health'],
-                'uid_led'=>$arr['uid_led'],
-                'power'=>$arr['power'],
-                'https_port'=>$arr['https_port'],
-                'ilo_name'=>$arr['ilo_name'],
+                'product.version' => $arr['ilo_fw_version'],
+                'dev.ip' => $arr['ip_address'],
             );
-            $val = [];
-            foreach ($get as $k=>$vo){
-                $t = [];
-                if($vo && !is_array($vo)){
-                    $t['{#NAME}'] = $this->replaceToUpper($k);
-                    $t['VALUE'] = $vo;
-                    $val[] = $t;
-                }
-            }
-            $this->allData = ArrayHelper::merge($this->allData,['SYS'=>$val]);
         }
+        $get['dev.timezone'] = $this->getTimeZone();
+        $this->allData = ArrayHelper::merge($this->allData,['local'=>$get]);
     }
 
+    protected function getTimeZone(){
+        $url = 'https://'.$this->ip.'/json/network_sntp/interface/0?_='.time().'&null';
+        $arr = $this->exec($url);
+        if ($arr){
+            $id =  $arr['our_zone'];
+            $path =  \Yii::getAlias('@app').'/models/HP/timezone.txt';
+            $file = file_get_contents($path);
+            $arr = json_decode($file,true);
+            foreach ($arr['zones'] as $vo){
+                if($vo['index'] == $id){
+                    return $vo['name'];
+                }
+            }
+        }
+        return '';
+    }
+
+
     protected function replaceToUpper($str){
-        return strtoupper ( str_replace(' ','',$str) );
+        $str = preg_replace("/\s*|\(|\)/",'',$str);
+        //return strtoupper ( $str );
+        return $str;
     }
 
 
@@ -144,7 +146,7 @@ class Hpdl580 extends  \app\components\BaseCurl
                     $val[] = $vo;
                 }
             }
-            $this->allData = ArrayHelper::merge($this->allData,['FAN'=>$val]);
+            $this->allData = ArrayHelper::merge($this->allData,['fan'=>$val]);
         }
     }
 
@@ -161,7 +163,7 @@ class Hpdl580 extends  \app\components\BaseCurl
                     $val[] = $vo;
                 }
             }
-            $this->allData = ArrayHelper::merge($this->allData,['TEMP'=>$val]);
+            $this->allData = ArrayHelper::merge($this->allData,['temp'=>$val]);
 
         }
     }
@@ -204,11 +206,24 @@ class Hpdl580 extends  \app\components\BaseCurl
             $arr2 = $arr['processors'];
             foreach ($arr2 as $k=> $vo){
                 if(!empty($vo)){
-                    $vo['{#NAME}'] = $this->replaceToUpper($vo['proc_socket']);
-                    $val[] = $vo;
+                    $tmp = explode(' ',$vo['proc_name']);
+
+                    $val[] = ArrayHelper::merge($vo,[
+                        'cpu.frequency' => $vo['proc_speed'],
+                        'cpu.name' => $this->replaceToUpper($vo['proc_socket']),
+                        'cpu.core' => $vo['proc_num_cores'],
+                        'cpu.thread' =>  $vo['proc_num_threads'],
+                        'cpu.qpi.width' => $vo['proc_mem_technology'],
+                        'cpu.l1.cache' => $vo['proc_num_l1cache'],
+                        'cpu.l2.cache' => $vo['proc_num_l2cache'],
+                        'cpu.l3.cache' => $vo['proc_num_l3cache'],
+                        'cpu.version' => $vo['proc_name'],
+                        'cpu.type' => $tmp[0],
+                        '{#NAME}' => 'CPU'.$k,
+                    ]);
                 }
             }
-            $this->allData = ArrayHelper::merge($this->allData,['PROC'=>$val]);
+            $this->allData = ArrayHelper::merge($this->allData,['cpu'=>$val]);
         }
     }
 
@@ -218,17 +233,16 @@ class Hpdl580 extends  \app\components\BaseCurl
         $arr = $this->exec($url);
         if ($arr){
             $val = [];
-            $arr2 = $arr['mem_modules'];
+            $arr2 = $arr['memory'];
             foreach ($arr2 as $k=> $vo){
-                if (!isset($arr['memory'][$k]['mem_dev_loc'])){
-                    continue;
-                }
-                if(!empty($vo) && $vo['mem_mod_smartmem'] == 'MEM_YES'  ){
-                    $vo['{#NAME}'] = $this->replaceToUpper($arr['memory'][$k]['mem_dev_loc']);
+                if($vo){
+                    $vo['{#NAME}'] = $this->replaceToUpper($vo['mem_dev_loc']);
+                    $vo['memory.frequency'] = $vo['mem_speed'];
+                    $vo['memory.size.total'] = $vo['mem_size'];
                     $val[] = $vo;
                 }
             }
-            $this->allData = ArrayHelper::merge($this->allData,['MEM'=>$val]);
+            $this->allData = ArrayHelper::merge($this->allData,['memory'=>$val]);
         }
     }
 
@@ -241,14 +255,15 @@ class Hpdl580 extends  \app\components\BaseCurl
             $arr2 = $arr['nics'];
             foreach ($arr2 as $k=> $vo){
                 if(!empty($vo)){
-                    $vo['{#NAME}'] = 'NIC'.$k;
+                    $vo['{#NAME}'] = $this->replaceToUpper($vo['dev_type']).$vo['port_num'];    //'nic'.$k;
+                    $vo['net.ifPhysAddress'] = $vo['mac_addr'];
+                    $vo['net.ifType'] = $vo['dev_type'];
                     $val[] = $vo;
                 }
             }
-            $this->allData = ArrayHelper::merge($this->allData,['NIC'=>$val]);
+            $this->allData = ArrayHelper::merge($this->allData,['nic'=>$val]);
         }
     }
-
 
     //固件版本
     protected function firmware(){
@@ -314,7 +329,6 @@ class Hpdl580 extends  \app\components\BaseCurl
         if(!isset($arr['message'])) return $arr;
         else return null;
     }
-
 
 
 

@@ -54,7 +54,7 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
         $this->login();
         $this->getAllSensors(); //硬件监控
         $this->fru();  //fru信息
-        $this->HWVersion(); //版本信息
+        //$this->HWVersion(); //版本信息
         $this->getHWInfo(); //资产信息
         $this->power();//资产电源
         $this->logout();
@@ -75,20 +75,39 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
         $str1 = $this->exec($url);
         $key = 'WEBVAR_STRUCTNAME_HL_GETALLFRUINFO';
         $fruArr=$this->re($key,$str1);
+        $val = [];
         if( !empty($fruArr) && isset($fruArr[0]) ){
             //只要部分数据
-            $tmp = array(
-                'FRUDeviceID','FRUDeviceName','PI_ProductInfoAreaFormatVersion','BI_MfgDateTime','BI_BoardMfr','BI_BoardProductName','PI_MfrName','PI_ProductName','PI_ProductVersion','PI_ProductSerialNum','PI_AssetTag'
+            $val = array(
+                'board.mfc' => $fruArr[0]['BI_BoardMfr'],
+                'board.name' => $fruArr[0]['BI_BoardProductName'],
+                'board.date' => $fruArr[0]['BI_MfgDateTime'],
+                'product.mfc' => $fruArr[0]['PI_MfrName'],
+                'product.name' => $fruArr[0]['PI_ProductName'],
+                'product.serial' => $fruArr[0]['PI_ProductSerialNum'],
+                'product.version' => $fruArr[0]['PI_ProductVersion'],
             );
-            $val=[];
-            foreach ($fruArr[0] as $k=> $vo){
-                if(in_array($k,$tmp)){
-                    $val[] = ['{#NAME}'=>strtoupper($k),'VALUE'=>$vo];
-                }
-            }
-            $this->allData = ArrayHelper::merge($this->allData,['FRU'=>$val]);
         }
+        $val['dev.timezone'] = $this->timezone();
+        $this->allData = ArrayHelper::merge($this->allData,['local'=>$val]);
     }
+
+    //时区
+    public function timezone(){
+        $url = 'http://'.$this->ip.'/rpc/getdatetime.asp';
+        $str1 = $this->exec($url);
+        $key = 'WEBVAR_STRUCTNAME_GETDATETIME';
+        $time=$this->re($key,$str1);
+        $str = '';
+        if( !empty($time) && isset($time[0]) ){
+            $hour = floor( $time[0]['UTCMINUTES']/ 60 ); //返回的是分钟
+            if ($hour > 0) $str = 'GMT + '.$hour.' : 00';
+            else $str = 'GMT - '.$hour.' : 00';
+        }
+        return $str;
+    }
+
+
 
     //版本信息
     public function HwVersion(){
@@ -228,11 +247,20 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
             $val = [];
             foreach ($arr2 as $vo){
                 if(!empty($vo)){
-                    $vo['{#NAME}'] = strtoupper($vo['CPUSocket']);
+                    $vo['{#NAME}'] = $vo['CPUSocket'];
+                    //$vo['cpu.type'] = $vo['CPUType'];
+                    $vo['cpu.l1.cache'] = $vo['L1Cache'] * 1024 ;//'KB';
+                    $vo['cpu.l2.cache'] = $vo['L2Cache'] * 1024;
+                    $vo['cpu.l3.cache'] = $vo['L3Cache'] * 1024; //
+                    $tmp = explode(' ',$vo['CPUVersion']);
+                    $vo['cpu.frequency'] = end($tmp);
+                    $vo['cpu.type'] = isset($tmp[0]) ? $tmp[0] : '';
+                    $vo['cpu.version'] = $vo['CPUVersion'];
+                    $vo['cpu.name'] = $vo['CPUSocket'];
                     $val[] = $vo;
                 }
             }
-            $this->allData = ArrayHelper::merge($this->allData,['CPU'=>$val]);
+            $this->allData = ArrayHelper::merge($this->allData,['cpu'=>$val]);
         }
     }
 
@@ -246,11 +274,37 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
             $val = [];
             foreach ($arr2 as $vo){
                 if(!empty($vo)){
-                    $vo['{#NAME}'] = strtoupper($vo['PCIESlot']);
+                    $vo['{#NAME}'] = $vo['PCIESlot'];
+                    $vo['pcie.speed'] = $vo['PCIELinkSpeed'];
+                    $vo['pcie.rated.width'] = $vo['PCIELinkWidth'];
+                    $vo['pcie.type'] = $this->getPcieType( $vo['PCIEClass']);
+                    $vo['pcie.mfc'] = $this->getPcieMfc( $vo['PCIEVendorId'] );
                     $val[] = $vo;
                 }
             }
-            $this->allData = ArrayHelper::merge($this->allData,['PCIE'=>$val]);
+            $this->allData = ArrayHelper::merge($this->allData,['pcie'=>$val]);
+        }
+    }
+
+    /**返回pcie 类型，没有找到他们的映射关系，用页面几个值的
+     * @param $class
+     * @return string
+     */
+    private function getPcieType($class){
+        switch ($class){
+            case  1 : $str = '大容量存储控制器';break;
+            case  2 : $str = '网络控制器';break;
+            case  12 : $str = '串行总线控制器';break;
+            default : $str = '未知';break;
+        }
+        return $str;
+    }
+    private function getPcieMfc($vendor){
+        switch ($vendor){
+            case 4215 : return 'QLogic Corp.';break;
+            case 32902 : return 'Intel Corporation';break;
+            case 36869 : return '0x9005';break;
+            default : return '未知';break;
         }
     }
 
@@ -264,11 +318,16 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
             $val = [];
             foreach ($arr2 as $vo){
                 if(!empty($vo)){
-                    $vo['{#NAME}'] = strtoupper($vo['MemDimm']);
+                    $vo['{#NAME}'] = $vo['MemDimm'];
+                    $vo['memory.type'] = $vo['MemType'] == 26 ? 'DDR4':'DDR3';
+                    $vo['memory.mfc'] = $vo['MemManufacturer'];
+                    $vo['memory.size.total'] = $vo['memSize'];
+                    $vo['memory.frequency'] = $vo['MemSpeed'];
+                    $vo['memory.frequency.current'] = $vo['MemCurrentSpeed'];
                     $val[] = $vo;
                 }
             }
-            $this->allData = ArrayHelper::merge($this->allData,['MEMORY'=>$val]);
+            $this->allData = ArrayHelper::merge($this->allData,['memory'=>$val]);
         }
     }
 
@@ -285,11 +344,19 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
             $val = [];
             foreach ($arr2 as $vo){
                 if(!empty($vo)){
-                    $vo['{#NAME}'] = 'POWER'.strtoupper($vo['Id']);
+                    $vo['{#NAME}'] = 'PSU'.$vo['Id'];
+                    $vo['power.mfc'] = $vo['MFRID'];
+                    $vo['power.local'] = 'PSU'.$vo['Id'];
+                    $vo['power.serial'] = $vo['SN'];
+                    $vo['power.version'] = $vo['FWVersion'];
+                    $vo['power.status'] = $vo['ErrStatus'] == 65535 ? 1:0;   //他这个0是正常，1是异常
+                    $vo['power.rating'] = $vo['PwrInWatts'];
+                    $vo['power.in'] = $vo['InputPower'];
+
                     $val[] = $vo;
                 }
             }
-            $this->allData = ArrayHelper::merge($this->allData,['POWER'=>$val]);
+            $this->allData = ArrayHelper::merge($this->allData,['power'=>$val]);
         }
     }
 
@@ -321,57 +388,85 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
         $arr2=$this->re($key,$str1);
 
         if($arr2){
-            $opt =  [];
-            $val = [];
-            $word = 'HARDWARE_';
+            $temp = [];
+            $voltage= [];
+            $amps = [];
+            $fan = [];
+            $power = [];
+            $drive = [];
+            $controller = [];
             foreach ($arr2 as $vo) {
                 $type = $vo['SensorType'];
-                $k = '';
-                $state = 0;
-                if($vo['SensorState'] && $vo['SensorReading'] ){
-                    $state = 1;
-                }
                 switch ($type){
-                    case 1:
-                        $k = $word.'TEMP';
-                        if(!$state){
-                            if(!$vo['SensorReading'])$state = 0;
-                        }
+                    case  1 : //temp
+                        $temp[] = array(
+                            'temp.name' => $vo['SensorName'],
+                            'temp.lower' => $vo['LowNCThresh']/1000,
+                            'temp.up' => $vo['HighNCThresh']/1000, // ° C
+                            '{#NAME}' => $vo['SensorName'],
+                        );
                         break;
-                    case 2: $k = $word.'PV';break;
-                    case 3: $k = $word.'AMP';break;
-                    case 4:
-                        $k = $word.'FAN';
-                        if(!$state){
-                            if($this->decToHex($vo['SensorReading'])==8001)$state = 0;
-                        }
-                        break;
-                    case 8:
-                        $k = $word.'POWER';
-                        if(!$state){
-                            $hex = $this->decToHex($vo['SensorReading']);
-                            if($hex==8001 || $hex==8009 || $hex==8081 || $hex==8089 )$state = 1;
-                        }
-                        break;
-                    case 13:
-                        $k = $word.'DRIVE';
-                        if(!$state){
-                            if($this->decToHex($vo['SensorReading'])==8001)$state = 1;
-                        }
-                        break;
-                    case 22:
-                        $k = $word.'CONTROL';
-                        if(!$state){
-                            if($this->decToHex($vo['SensorReading'])==8002)$state = 1;
-                            elseif($this->decToHex($vo['SensorReading'])==8001)$state = 0;
-                        }
-                        break;
-                }
 
-                $vo['{#NAME}'] = strtoupper($vo['SensorName']);
-                $val[$k][] = $vo;
+                    case 2 : // voltage
+                        $voltage[] = array(
+                            'voltage.name' => $vo['SensorName'],
+                            'voltage.lower' => $vo['LowNCThresh']/1000, //V
+                            'voltage.up' => $vo['HighNCThresh']/1000,
+                            '{#NAME}' => $vo['SensorName'],
+                        );
+                        break;
+                    case 3 : // amps
+                        $amps[] = array(
+                            'amps.name' => $vo['SensorName'],
+                            'amps.lower' => $vo['LowNCThresh']/1000, // Amps
+                            'amps.up' => $vo['HighNCThresh']/1000,
+                            '{#NAME}' => $vo['SensorName'],
+                        );
+                        break;
+                    case 4: // fan
+                        $fan[] = array(
+                            'fan.name' => $vo['SensorName'],
+                            'fan.lower' => $vo['LowNCThresh']/1000, //RPM
+                            'fan.up' => $vo['HighNCThresh']/1000,
+                            '{#NAME}' => $vo['SensorName'],
+                        );
+                        break;
+
+                    case  8 : //power
+                        $power[] =  array(
+                            'power.name' => $vo['SensorName'],
+                            '{#NAME}' => $vo['SensorName'],
+                        );
+                        break;
+                    case  13 : //drive
+                        $hex = $this->decToHex($vo['SensorReading']);
+                        if($hex==8001)  $status = 1;
+                        else $status = 0;
+                        $drive[] =  array(
+                            'drive.name' => $vo['SensorName'],
+                            '{#NAME}' => $vo['SensorName'],
+                            'drive.status' =>$status ,
+                            'drive.value' => '0x'.$hex,
+                        );
+                        break;
+                    case  22 : //controller
+                        $controller[] =  array(
+                            'controller.name' => $vo['SensorName'],
+                            '{#NAME}' => $vo['SensorName'],
+                        );
+                        break;
+
+                }
             }
-            $this->allData = ArrayHelper::merge($this->allData,$val);
+            $this->allData = ArrayHelper::merge($this->allData,
+                ['temp' => $temp ],
+                [ 'voltages' => $voltage ],
+                [ 'amps' => $amps ],
+                [ 'fan' => $fan ],
+                //[ 'power'=> $power ],
+                [ 'drive' => $drive ],
+                ['controller' => $controller]
+            );
         }
 
     }

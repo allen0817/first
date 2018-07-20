@@ -24,9 +24,11 @@ class HelloController extends Controller
      * This command echoes what you have entered as the message.
      * @param string $message the message to be echoed.
      */
-    public function actionIndex($message = 'hello world')
+    public function actionIndex($ip)
     {
-        echo $message . "\n";
+        $command = "ipmitool -I lan -H 10.240.240.$ip -U admin -P admin mc reset warm";
+        exec($command);
+
     }
 
 
