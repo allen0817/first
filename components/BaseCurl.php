@@ -42,6 +42,7 @@ abstract class BaseCurl
     //北京 根目录  /usr/local/src/first/
 
     protected $path;
+    protected $dir;
 
     /**
      * @param $options
@@ -57,7 +58,8 @@ abstract class BaseCurl
 
         $this->class = $class;
 
-        $this->path = self::$BASE_PATH.$ip;
+        $this->dir = $this->getCachePath();
+        $this->path = $this->dir . $this->ip;
 
         $this->getClient();
     }
@@ -150,23 +152,25 @@ abstract class BaseCurl
     }
 
     public  function run(){
-        if(file_exists($this->path)){
+        if(file_exists($this->path){
             $file_json = file_get_contents($this->path);
-            $file_arr = json_decode($file_json,true);
-            if($file_arr['time'] + self::$timeOut < time() ){ //超时
-                $pid= pcntl_fork();
-                if ($pid == -1) {
-                    die('could not fork');
-                }elseif (!$pid) {
-                    //手动释放内存
-                    $file_json = null;
-                    $file_arr = null;
-                    $params = ' '.$this->ip .' '.$this->user .' '.$this->pwd .' '. $this->class;
-                    shell_exec("php  /usr/local/src/first/yii sipder/process   $params  > /dev/null 2>&1 & ");
-                    exit();
+            if ($file_json) {
+                $file_arr = json_decode($file_json,true);
+                if($file_arr['time'] + self::$timeOut < time() ){ //超时
+                    $pid= pcntl_fork();
+                    if ($pid == -1) {
+                        die('could not fork');
+                    }elseif (!$pid) {
+                        //手动释放内存
+                        $file_json = null;
+                        $file_arr = null;
+                        $params = ' '.$this->ip .' '.$this->user .' '.$this->pwd .' '. $this->class;
+                        shell_exec("php  /usr/local/src/first/yii sipder/process   $params  > /dev/null 2>&1 & ");
+                        exit();
+                    }
                 }
-            }
-            return $file_arr['data'];
+                return $file_arr['data'];
+            } 
         }else{//第一次
             $this->getData();
             if (!empty($this->allData)){
@@ -177,8 +181,8 @@ abstract class BaseCurl
                 $this->save($data);
                 return $this->allData;
             }
-            return [];
         }
+        return [];
     }
 
 
@@ -207,9 +211,12 @@ abstract class BaseCurl
     }
 
     protected function check(){
-        //  /usr/local/src/php_script/first/web/curl_data/check
-        //$file = '/usr/local/src/first/web/curl_data/check';
-        $file = static::$BASE_PATH.'check';
+        $file = $this->dir . 'check' ;
+        if(!file_exists($file)){
+            $fd = fopen($file, 'w');
+            fclose($fd);
+        }
+
         $json = file_get_contents($file);
         $arr = json_decode($json,true);
 
@@ -227,18 +234,7 @@ abstract class BaseCurl
     }
 
 
-    protected function childProcess1($file_arr){
-        $this->getData();
-        if(!empty($this->allData)){
-            $new = $this->checkData($file_arr['data'],$this->allData);
-            $data =  [
-                'data' => $new,
-                'time' => time(),
-            ];
-            $this->save($data);
-        }
-        exit();
-    }
+
 
     /** 缓存数据到文件
      * @param $data
@@ -293,13 +289,29 @@ abstract class BaseCurl
      */
     public function resetBmc()
     {
-        $file_json = file_get_contents($this->path);
-        $file_arr = json_decode($file_json,true);
-        @$file_arr['data']['local']['bmc'] = 0;
-        @$this->save($file_arr);
-
+        if(file_exists($this->path)){
+            $file_json = file_get_contents($this->path);
+            $file_arr = json_decode($file_json,true);
+            @$file_arr['data']['local']['bmc'] = 0;
+            @$this->save($file_arr);
+        }
         $command = "ipmitool -I lan -H $this->ip -U $this->user -P $this->pwd mc reset warm";
         exec($command);  
+    }
+
+
+    public  function getCachePath(){
+        $this->class = $class;
+        $dir = self::$BASE_PATH . $this->class ;
+        is_dir($dir) OR mkdir($dir,0777,true);
+
+        $path =  $dir . DIRECTORY_SEPARATOR . $this->ip;
+        
+        if(!file_exists($path)){
+            $fd = fopen($path, 'w');
+            fclose($fd);
+        }
+        return  $dir . DIRECTORY_SEPARATOR;
     }
 
 

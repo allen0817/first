@@ -30,57 +30,6 @@ class SipderController extends Controller
      *                                                  ip          user    pwd     型号
      */
 
-    public function actionComoptions(){
-        $get = $_SERVER['argv'];
-        if(isset($get[2])) $ip = $get[2];
-        if(isset($get[3])) $user = $get[3];
-        if(isset($get[4])) $pwd = $get[4];
-        if(isset($get[5])) $class = $get[5];
-        if(isset($get[6])) $options = $get[6];
-
-        $class = ucfirst( strtolower($class) );
-
-        $dir = Common::findClass($class);
-        if (!$dir) echo json_encode(['data'=>[]]);
-        $ch =  '\app\models\\'.$dir.'\\'.$class;
-        $curl = new  $ch($ip,$user,$pwd,$class);
-        try{
-            $data = $curl->run();
-            if(!empty($data)){
-                if(isset($data[$options])){
-                    $val = [];
-                    foreach ($data[$options] as $vo){
-                        $val[] = array(
-                            '{#NAME}' => $vo['{#NAME}']
-                        );
-                    }
-                    echo json_encode( ['data'=>$val] );exit();
-                }
-            }
-        }catch (Exception $e){
-
-        }
-        echo json_encode( ['data'=>[]] );exit();
-    }
-
-    public function actionComdatas(){
-        $get = $_SERVER['argv'];
-        if(isset($get[2])) $key = $get[2];
-        if(isset($get[3])) $ip = $get[3];
-        if(isset($get[4])) $user = $get[4];
-        if(isset($get[5])) $pwd = $get[5];
-        if(isset($get[6])) $class = $get[6];
-        if(isset($get[7])) $options = $get[7];
-        $class = ucfirst( strtolower($class) );
-
-        $dir = Common::findClass($class);
-        if (!$dir) echo json_encode(['data'=>[]]);
-        $ch =  '\app\models\\'.$dir.'\\'.$class;
-        $curl = new  $ch($ip,$user,$pwd,$class);
-        $curl->getVal($key);
-    }
-
-
     public function actionProcess($ip,$user,$pwd,$class){
         //file_put_contents('/usr/local/src/first/web/curl_data/a.txt','allen');
         $get = $_SERVER['argv'];
@@ -155,7 +104,6 @@ class SipderController extends Controller
 
     public function actionDatas(){
         $get = $_SERVER['argv'];
-
         if(isset($get[2])) $obj = $get[2];
         if(isset($get[3])) $key = $get[3];
         if(isset($get[4])) $ip = $get[4];

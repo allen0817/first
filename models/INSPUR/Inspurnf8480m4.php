@@ -61,6 +61,7 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
         //$this->HWVersion(); //版本信息
         $this->getHWInfo(); //资产信息
         $this->power();//资产电源
+        $this->nic();//网卡
         $this->logout();
     }
 
@@ -144,6 +145,28 @@ class Inspurnf8480m4 extends  \app\components\BaseCurl
         $this->cpu($str1);
         $this->pcie($str1);
         $this->memory($str1);
+    }
+
+    //网卡信息
+    public function nic(){
+        $url = 'http://'.$this->ip.'/rpc/getalllancfg.asp';
+        $str1 = $this->exec($url);
+        $key = 'WEBVAR_STRUCTNAME_GETALLNETWORKCFG';
+        $arr2=$this->re($key,$str1);
+        if($arr2){
+            $val = [];
+            foreach ($arr2 as $vo){
+                if(!empty($vo)){
+                    $vo['{#NAME}'] = 'eth'.$vo['channelNum'];
+                    $vo['net.ifPhysAddress'] = $vo['macAddress'];//mac 
+                    $vo['net.if.ip.addr'] = $vo['v4IPAddr']; //v4IPAddr
+                    $vo['net.if.mask'] = $vo['v4Subnet']; //v4Subnet
+                    $vo['net.if.gateway'] = $vo['v4Gateway']; //v4Gateway
+                    $val[] = $vo;
+                }
+            }
+            $this->allData = ArrayHelper::merge($this->allData,['nic'=>$val]);
+        }
     }
 
 

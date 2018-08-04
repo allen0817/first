@@ -129,7 +129,8 @@ class Ucloudtc4600t extends  \app\components\BaseCurl
                     $tmp = explode(" ",$vo['cpuBrandName']);
                     $vo['cpu.type'] = isset($tmp[0]) ? $tmp[0] : '';
                     $vo['cpu.frequency'] = isset($tmp[6]) ? $tmp[6] : ''; //主频
-                    $vo['cpu.present']  = $vo['cpuPresent']; // == 1 ? '可用':'不可用';
+                    $vo['cpu.
+                    ']  = $vo['cpuPresent']; // == 1 ? '可用':'不可用';
                     $vo['cpu.qpi.width']  = $this->getCpuQpiWidth($vo['cpuQpiWidth']);
                     $vo['cpu.status']  = $vo['cpuState']; // == 0? '可用':'不可用';
                     $val[] = $vo;
@@ -536,10 +537,10 @@ class Ucloudtc4600t extends  \app\components\BaseCurl
                     $vo['{#NAME}'] = $this->getMemoryName($vo['nodeNo'],$vo['channelNo'],$vo['dimmNo']);
                     $vo['memory.present'] =  $vo['memPresent'];//1 ? 'present' : 'absent';
                     $vo['memory.type'] = 'DDR'.$vo['memType'];
-                    $vo['memory.speed'] = $this->translateMemFre($vo['memType'],$vo['memFreq']);
-                    $vo['memory.size'] =  $vo['memSize'];
+                    $vo['memory.frequency'] = $this->translateMemFre($vo['memType'],$vo['memFreq']);
+                    $vo['memory.size.total'] =  $vo['memSize'];
                     $vo['memory.mfc'] =  $vo['memManufact'];
-                    $vo['memory.model'] =  $vo['memPN'];
+                    $vo['parts.model'] =  $vo['memPN'];
                     $vo['ecc.number'] =  $vo['memEccNum'];
                     $vo['memory.status'] =  $vo['memState']; // 0 normal
                     $val[] = $vo;
